@@ -28,9 +28,6 @@
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
 
-  --grid-line: rgba(255, 255, 255, 0.035);
-  --scanline: rgba(255, 255, 255, 0.018);
-
   /* Fixas — não trocam com o tema. Painel de assinatura (login) fica sempre
      no mesmo tom, mesmo se o resto virar claro. */
   --signature-ink: #000000;
@@ -64,9 +61,6 @@
     --color-on-sheipe: #f0fdf4;
 
     --shadow-card: 0 1px 2px rgba(16, 18, 21, 0.04), 0 8px 24px -12px rgba(16, 18, 21, 0.12);
-
-    --grid-line: rgba(16, 18, 21, 0.045);
-    --scanline: rgba(16, 18, 21, 0.02);
   }
 }
 
@@ -97,8 +91,6 @@
   --color-sheipe-deep: #4ade80;
   --color-on-sheipe: #04150a;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
-  --grid-line: rgba(255, 255, 255, 0.035);
-  --scanline: rgba(255, 255, 255, 0.018);
 }
 
 :root[data-theme="light"] {
@@ -121,8 +113,6 @@
   --color-sheipe-deep: #15803d;
   --color-on-sheipe: #f0fdf4;
   --shadow-card: 0 1px 2px rgba(16, 18, 21, 0.04), 0 8px 24px -12px rgba(16, 18, 21, 0.12);
-  --grid-line: rgba(16, 18, 21, 0.045);
-  --scanline: rgba(16, 18, 21, 0.02);
 }
 
 * {
@@ -137,28 +127,7 @@ body {
   color: var(--color-ink);
   background: var(--color-paper);
   font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  position: relative;
   min-height: 100vh;
-}
-
-/* Grade + scanlines sutis — sensação de painel/app, não tela lisa. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image:
-    repeating-linear-gradient(0deg, var(--scanline) 0px, var(--scanline) 1px, transparent 1px, transparent 3px),
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: 100% 3px, 56px 56px, 56px 56px;
-}
-
-#__next,
-body > div {
-  position: relative;
-  z-index: 1;
 }
 
 ::selection {
