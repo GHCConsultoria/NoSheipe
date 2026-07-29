@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
@@ -16,6 +17,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * src/lib/nutri/prisma.ts — o client libSQL lê a URL no import do módulo.
  * Daí os `await import()` dentro do beforeAll, em vez de imports no topo.
  */
+
+/** init.sql resolvido a partir deste arquivo — não depende do cwd de quem roda o vitest. */
+const CAMINHO_INIT_SQL = path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../prisma/nutri/init.sql");
 
 const diretorio = mkdtempSync(path.join(tmpdir(), "nosheipe-teste-"));
 const arquivoBanco = path.join(diretorio, "teste.db");
@@ -48,17 +52,8 @@ beforeAll(async () => {
   const { createClient } = await import("@libsql/client");
   const bruto = createClient({ url: `file:${arquivoBanco}` });
 
-  const caminhoSql = path.join(process.cwd(), "prisma", "nutri", "init.sql");
-  const statements = readFileSync(caminhoSql, "utf8")
-    .split(";")
-    .map((bloco) =>
-      bloco
-        .split("\n")
-        .filter((linha) => !linha.trim().startsWith("--"))
-        .join("\n")
-        .trim(),
-    )
-    .filter((s) => s.length > 0);
+  const { separarStatements } = await import("../../../prisma/nutri/separar-statements.mjs");
+  const statements = separarStatements(readFileSync(CAMINHO_INIT_SQL, "utf8"));
 
   for (const stmt of statements) {
     await bruto.execute(stmt);

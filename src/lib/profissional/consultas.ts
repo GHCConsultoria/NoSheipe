@@ -184,7 +184,35 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
   };
 }
 
-/** Vínculos ativos contam a vaga do plano. */
+/** Vínculos ativos contam a vaga do plano — pendentes ainda não. */
 export async function contarVinculosAtivos(profissionalId: string): Promise<number> {
   return prismaNutri.vinculo.count({ where: { profissionalId, status: StatusVinculo.ATIVO } });
+}
+
+export interface SolicitacaoEnviada {
+  id: string;
+  clienteNome: string;
+  tipo: TipoVinculo;
+  criadoEm: Date;
+}
+
+/**
+ * Pedidos que este profissional mandou e o cliente ainda não respondeu.
+ *
+ * Devolve só o nome: enquanto o cliente não aceita, não existe vínculo, e
+ * portanto nada de dado de saúde dele pode aparecer aqui.
+ */
+export async function buscarSolicitacoesEnviadas(profissionalId: string): Promise<SolicitacaoEnviada[]> {
+  const pendentes = await prismaNutri.vinculo.findMany({
+    where: { profissionalId, status: StatusVinculo.PENDENTE },
+    include: { cliente: { select: { nome: true } } },
+    orderBy: { criadoEm: "desc" },
+  });
+
+  return pendentes.map((v) => ({
+    id: v.id,
+    clienteNome: v.cliente.nome,
+    tipo: v.tipo as TipoVinculo,
+    criadoEm: v.criadoEm,
+  }));
 }

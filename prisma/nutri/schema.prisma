@@ -141,8 +141,16 @@ model Vinculo {
   criadoEm DateTime  @default(now())
   aceitoEm DateTime?
 
-  // Um cliente tem no máximo um nutricionista e um personal.
-  @@unique([clienteId, tipo])
+  // Um cliente tem no máximo um nutricionista e um personal — mas essa
+  // regra vale só entre vínculos VIVOS (PENDENTE/ATIVO). Um @@unique
+  // simples em [clienteId, tipo] obrigaria a sobrescrever a linha quando
+  // um profissional substitui outro, apagando o registro de que o
+  // anterior existiu. O índice fica em init.sql como índice parcial
+  // ("WHERE status <> 'ENCERRADO'"), que o Prisma não sabe declarar.
+  //
+  // Consequência: não existe findUnique por [clienteId, tipo] — as
+  // consultas usam findFirst filtrando por status.
+  @@index([clienteId, tipo])
   @@map("vinculos")
 }
 

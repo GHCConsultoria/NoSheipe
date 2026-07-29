@@ -8,6 +8,7 @@ import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/compo
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
 import { registrarPeso, registrarTreino, removerFavorito, salvarFavorito } from "@/lib/cliente/publico";
+import { MeusProfissionais, SolicitacoesPendentes } from "@/components/cliente/MeusProfissionais";
 
 interface SaldoMacro {
   consumido: number;
@@ -15,9 +16,18 @@ interface SaldoMacro {
   percentual: number;
 }
 
+interface Vinculo {
+  id: string;
+  tipo: "NUTRICAO" | "TREINO";
+  profissionalNome: string;
+}
+
 interface Props {
   token: string;
   nome: string;
+  codigoConvite: string;
+  vinculosAtivos: Vinculo[];
+  solicitacoes: Vinculo[];
   nutricao: {
     saldo: { kcal: SaldoMacro; proteina: SaldoMacro; carbo: SaldoMacro; gordura: SaldoMacro };
     registrosHoje: {
@@ -48,7 +58,15 @@ interface Props {
  * Cada bloco só aparece se existir o profissional correspondente — quem só
  * tem nutricionista nunca vê nada de treino.
  */
-export function HomeDoCliente({ token, nome, nutricao, treino }: Props) {
+export function HomeDoCliente({
+  token,
+  nome,
+  codigoConvite,
+  vinculosAtivos,
+  solicitacoes,
+  nutricao,
+  treino,
+}: Props) {
   const semAcompanhamento = !nutricao && !treino;
 
   return (
@@ -58,10 +76,15 @@ export function HomeDoCliente({ token, nome, nutricao, treino }: Props) {
       </div>
       <h1 className="font-display text-2xl">Olá, {nome}</h1>
 
+      {/* Antes do progresso: quem está esperando resposta dele. Aparece
+          inclusive pra quem ainda não tem nenhum profissional — é
+          justamente quem mais recebe solicitação. */}
+      <SolicitacoesPendentes token={token} solicitacoes={solicitacoes} />
+
       {semAcompanhamento ? (
         <p className="mt-6 text-sm text-ink-soft">
-          Você ainda não tem nenhum profissional acompanhando. Assim que um nutricionista ou personal te adicionar, o
-          seu progresso aparece aqui.
+          Você ainda não tem nenhum profissional acompanhando. Passe o código abaixo pro seu nutricionista ou personal
+          — assim que você aceitar o pedido dele, seu progresso aparece aqui.
         </p>
       ) : (
         <>
@@ -89,6 +112,8 @@ export function HomeDoCliente({ token, nome, nutricao, treino }: Props) {
           )}
         </>
       )}
+
+      <MeusProfissionais token={token} codigoConvite={codigoConvite} ativos={vinculosAtivos} />
     </main>
   );
 }

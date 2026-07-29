@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { obterProfissionalAtual } from "@/lib/profissional/auth";
-import { buscarClientesDoProfissional, contarVinculosAtivos } from "@/lib/profissional/consultas";
+import {
+  buscarClientesDoProfissional,
+  buscarSolicitacoesEnviadas,
+  contarVinculosAtivos,
+} from "@/lib/profissional/consultas";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
+import { AdicionarPorCodigo } from "@/components/cliente/AdicionarPorCodigo";
 import { sairProfissional } from "../login/actions";
 
 /**
@@ -12,9 +17,10 @@ import { sairProfissional } from "../login/actions";
  */
 export default async function Painel() {
   const profissional = await obterProfissionalAtual();
-  const [clientes, totalAtivos] = await Promise.all([
+  const [clientes, totalAtivos, solicitacoes] = await Promise.all([
     buscarClientesDoProfissional(profissional.id),
     contarVinculosAtivos(profissional.id),
+    buscarSolicitacoesEnviadas(profissional.id),
   ]);
 
   const vagasRestantes = profissional.limitePlano - totalAtivos;
@@ -43,20 +49,42 @@ export default async function Painel() {
         {vagasRestantes <= 0 ? " — limite atingido" : ""}.
       </p>
 
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col gap-3">
         {vagasRestantes > 0 ? (
-          <Link
-            href="/pro/clientes/novo"
-            className="inline-flex items-center gap-1.5 rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep"
-          >
-            <Plus size={15} strokeWidth={2} /> Novo cliente
-          </Link>
+          <>
+            <Link
+              href="/pro/clientes/novo"
+              className="inline-flex w-fit items-center gap-1.5 rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep"
+            >
+              <Plus size={15} strokeWidth={2} /> Novo cliente
+            </Link>
+            <AdicionarPorCodigo
+              ehNutricionista={profissional.ehNutricionista}
+              ehPersonal={profissional.ehPersonal}
+            />
+          </>
         ) : (
           <p className="text-sm text-urgent">
             Limite de {profissional.limitePlano} atingido — encerre um acompanhamento pra liberar vaga.
           </p>
         )}
       </div>
+
+      {solicitacoes.length > 0 && (
+        <section className="mt-8">
+          <h2 className="eyebrow mb-3">Aguardando o cliente aceitar</h2>
+          <ul className="flex flex-col gap-2">
+            {solicitacoes.map((s) => (
+              <li key={s.id} className="paper-card flex items-baseline justify-between gap-3 rounded-sm p-4">
+                <p className="text-sm">{s.clienteNome}</p>
+                <span className="eyebrow shrink-0 text-ink-faint">
+                  {s.tipo === "NUTRICAO" ? "dieta" : "treino"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <ul className="mt-8 flex flex-col gap-3">
         {clientes.map(({ cliente, nutricao, treino }) => {

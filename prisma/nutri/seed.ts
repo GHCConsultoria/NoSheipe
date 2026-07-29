@@ -33,6 +33,48 @@ async function seedProfissionalDemo() {
 }
 
 /**
+ * Segundo profissional, só personal — existe pra o fluxo da Fase 3 ser
+ * testável sem criar duas contas: é ele que aparece pedindo pra acompanhar
+ * o treino de um cliente que já tem nutricionista.
+ */
+async function seedOutroProfissional() {
+  return prismaNutri.profissional.upsert({
+    where: { authUserId: "demo-personal-convidado-auth-id" },
+    update: {},
+    create: {
+      authUserId: "demo-personal-convidado-auth-id",
+      nome: "Bruno Personal (demo)",
+      email: "bruno.personal.demo@example.com",
+      ehNutricionista: false,
+      ehPersonal: true,
+      cref: "CREF-0001",
+    },
+  });
+}
+
+/**
+ * Deixa um pedido de acompanhamento esperando resposta na página do
+ * cliente, pra a tela de aceitar/recusar ter o que mostrar no preview.
+ *
+ * Idempotente: só cria se não houver vínculo vivo desse tipo. Sem isso, um
+ * segundo deploy esbarraria no índice parcial — ou pior, recriaria o
+ * pedido depois de o cliente já ter recusado.
+ */
+async function seedSolicitacaoPendente(clienteToken: string, profissionalId: string, tipo: "NUTRICAO" | "TREINO") {
+  const cliente = await prismaNutri.cliente.findUnique({ where: { tokenAcesso: clienteToken } });
+  if (!cliente) return;
+
+  const vivo = await prismaNutri.vinculo.findFirst({
+    where: { clienteId: cliente.id, tipo, status: { not: "ENCERRADO" } },
+  });
+  if (vivo) return;
+
+  await prismaNutri.vinculo.create({
+    data: { clienteId: cliente.id, profissionalId, tipo, status: "PENDENTE" },
+  });
+}
+
+/**
  * Dono dos clientes de exemplo. Com Supabase configurado o login resolve a
  * conta real e o demo fica inalcançável — o painel abriria vazio. Definir
  * DONO_DEMO_EMAIL com o e-mail de uma conta real passa os exemplos pra ela.
@@ -260,11 +302,22 @@ async function seedClientes(profissionalId: string) {
       ["TREINO", Boolean(fake.treino)],
     ] as const) {
       if (!temPrescricao) continue;
-      await prismaNutri.vinculo.upsert({
-        where: { clienteId_tipo: { clienteId: cliente.id, tipo } },
-        update: { profissionalId, status: "ATIVO" },
-        create: { clienteId: cliente.id, profissionalId, tipo, status: "ATIVO", aceitoEm: new Date() },
+      // Sem upsert por [clienteId, tipo]: o unique agora é parcial (só
+      // entre vínculos vivos), então o Prisma não o conhece. Procura o
+      // vínculo vivo à mão e reaponta, que é o mesmo efeito.
+      const vivo = await prismaNutri.vinculo.findFirst({
+        where: { clienteId: cliente.id, tipo, status: { not: "ENCERRADO" } },
       });
+      if (vivo) {
+        await prismaNutri.vinculo.update({
+          where: { id: vivo.id },
+          data: { profissionalId, status: "ATIVO", aceitoEm: vivo.aceitoEm ?? new Date() },
+        });
+      } else {
+        await prismaNutri.vinculo.create({
+          data: { clienteId: cliente.id, profissionalId, tipo, status: "ATIVO", aceitoEm: new Date() },
+        });
+      }
     }
 
     if (fake.metas) {
@@ -332,7 +385,14 @@ async function semear() {
   const demo = await seedProfissionalDemo();
   const dono = await obterDono(demo);
   await seedClientes(dono.id);
+
+  // Rafael só tem nutrição — o Bruno pede o treino dele, e o pedido fica
+  // aguardando resposta em /p/demo-rafael-lima.
+  const bruno = await seedOutroProfissional();
+  await seedSolicitacaoPendente("demo-rafael-lima", bruno.id, "TREINO");
+
   console.log(`${CLIENTES_FAKE.length} clientes fake semeados no Turso, atribuídos a "${dono.nome}".`);
+  console.log(`Pedido de vínculo pendente de "${bruno.nome}" em /p/demo-rafael-lima.`);
 }
 
 semear()

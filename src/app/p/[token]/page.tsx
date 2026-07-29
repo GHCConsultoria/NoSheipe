@@ -33,6 +33,9 @@ export default async function PaginaCliente({ params }: { params: { token: strin
     <HomeDoCliente
       token={cliente.tokenAcesso}
       nome={cliente.nome}
+      codigoConvite={cliente.codigoConvite}
+      vinculosAtivos={painel.vinculosAtivos}
+      solicitacoes={painel.solicitacoes}
       nutricao={painel.nutricao}
       treino={painel.treino}
     />

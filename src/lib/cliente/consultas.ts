@@ -17,14 +17,36 @@ export async function buscarClientePorToken(token: string) {
   return cliente;
 }
 
-/** Vínculos ativos do cliente, por tipo. */
-async function vinculosAtivos(clienteId: string) {
+/** Um vínculo como o cliente enxerga: quem é a pessoa e em quê. */
+export interface VinculoDoCliente {
+  id: string;
+  tipo: TipoVinculo;
+  profissionalNome: string;
+}
+
+/**
+ * Vínculos vivos do cliente. PENDENTE e ATIVO vêm juntos numa consulta só
+ * porque a home precisa dos dois: o que já vale e o que está esperando
+ * resposta dele.
+ */
+async function vinculosVivos(clienteId: string) {
   const vinculos = await prismaNutri.vinculo.findMany({
-    where: { clienteId, status: StatusVinculo.ATIVO },
+    where: { clienteId, status: { not: StatusVinculo.ENCERRADO } },
+    include: { profissional: { select: { nome: true } } },
+    orderBy: { criadoEm: "asc" },
   });
+
+  const mapear = (status: StatusVinculo): VinculoDoCliente[] =>
+    vinculos
+      .filter((v) => v.status === status)
+      .map((v) => ({ id: v.id, tipo: v.tipo as TipoVinculo, profissionalNome: v.profissional.nome }));
+
+  const ativos = mapear(StatusVinculo.ATIVO);
   return {
-    temNutricao: vinculos.some((v) => v.tipo === TipoVinculo.NUTRICAO),
-    temTreino: vinculos.some((v) => v.tipo === TipoVinculo.TREINO),
+    ativos,
+    pendentes: mapear(StatusVinculo.PENDENTE),
+    temNutricao: ativos.some((v) => v.tipo === TipoVinculo.NUTRICAO),
+    temTreino: ativos.some((v) => v.tipo === TipoVinculo.TREINO),
   };
 }
 
@@ -56,6 +78,10 @@ export interface PainelDoCliente {
   nutricao: BlocoNutricao | null;
   /** null quando o cliente não tem personal. */
   treino: BlocoTreino | null;
+  /** Quem acompanha hoje — o cliente pode encerrar qualquer um. */
+  vinculosAtivos: VinculoDoCliente[];
+  /** Profissionais que pediram acesso e aguardam a resposta dele. */
+  solicitacoes: VinculoDoCliente[];
 }
 
 const FORMATADOR_HORA = new Intl.DateTimeFormat("pt-BR", {
@@ -73,7 +99,7 @@ const FORMATADOR_HORA = new Intl.DateTimeFormat("pt-BR", {
  * personal, ou os dois.
  */
 export async function buscarPainelDoCliente(cliente: Cliente): Promise<PainelDoCliente> {
-  const { temNutricao, temTreino } = await vinculosAtivos(cliente.id);
+  const { ativos, pendentes, temNutricao, temTreino } = await vinculosVivos(cliente.id);
   const { inicio: inicioHoje, fim: fimHoje } = limitesDoDiaEmSaoPaulo();
 
   const [nutricao, treino] = await Promise.all([
@@ -81,7 +107,7 @@ export async function buscarPainelDoCliente(cliente: Cliente): Promise<PainelDoC
     temTreino ? montarBlocoTreino(cliente.id, inicioHoje, fimHoje) : Promise.resolve(null),
   ]);
 
-  return { cliente, nutricao, treino };
+  return { cliente, nutricao, treino, vinculosAtivos: ativos, solicitacoes: pendentes };
 }
 
 async function montarBlocoNutricao(clienteId: string, inicioHoje: Date, fimHoje: Date): Promise<BlocoNutricao> {

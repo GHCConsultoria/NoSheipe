@@ -13,10 +13,13 @@ import {
   atualizarTreinoSchema,
   clienteIdSchema,
   criarClienteSchema,
+  solicitarVinculoSchema,
 } from "@/lib/cliente/schemas";
 
 export type ResultadoAcao = { sucesso: true } | { sucesso: false; erro: string };
 export type ResultadoToken = { sucesso: true; token: string } | { sucesso: false; erro: string };
+/** Devolve o nome pra quem pediu confirmar que digitou o código certo. */
+export type ResultadoSolicitacao = { sucesso: true; nome: string } | { sucesso: false; erro: string };
 
 function gerarTokenAcesso(): string {
   return randomBytes(24).toString("hex");
@@ -133,6 +136,69 @@ export async function criarCliente(input: unknown): Promise<ResultadoAcao> {
 
   revalidatePath("/pro");
   return { sucesso: true };
+}
+
+/**
+ * Um profissional pede pra acompanhar um cliente que já existe, usando o
+ * código que o próprio cliente passou pra ele.
+ *
+ * O vínculo nasce PENDENTE: quem libera é o cliente, na página dele. Dado
+ * de saúde é dele, então a decisão de compartilhar também — nenhum
+ * profissional entra sozinho na ficha de ninguém.
+ */
+export async function solicitarVinculo(input: unknown): Promise<ResultadoSolicitacao> {
+  const parsed = solicitarVinculoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+  const { codigoConvite, tipo } = parsed.data;
+
+  // TipoVinculo e Capacidade compartilham os mesmos valores de propósito.
+  const profissional = await exigirCapacidade(
+    tipo === TipoVinculo.NUTRICAO ? Capacidade.NUTRICAO : Capacidade.TREINO,
+  );
+
+  const totalAtivos = await prismaNutri.vinculo.count({
+    where: { profissionalId: profissional.id, status: StatusVinculo.ATIVO },
+  });
+  if (totalAtivos >= profissional.limitePlano) {
+    return {
+      sucesso: false,
+      erro: `limite de ${profissional.limitePlano} do plano atingido — encerre um acompanhamento antes`,
+    };
+  }
+
+  const cliente = await prismaNutri.cliente.findUnique({ where: { codigoConvite } });
+  if (!cliente || cliente.status !== StatusCliente.ATIVO) {
+    return { sucesso: false, erro: "código não encontrado — confira com o cliente" };
+  }
+
+  // Vínculo "vivo" é PENDENTE ou ATIVO. Encerrados não bloqueiam: são
+  // histórico, e um cliente pode voltar a ter nutricionista depois.
+  const vivo = await prismaNutri.vinculo.findFirst({
+    where: { clienteId: cliente.id, tipo, status: { not: StatusVinculo.ENCERRADO } },
+  });
+  if (vivo) {
+    if (vivo.profissionalId === profissional.id) {
+      return {
+        sucesso: false,
+        erro:
+          vivo.status === StatusVinculo.PENDENTE
+            ? "você já pediu — falta o cliente aceitar"
+            : "você já acompanha esse cliente",
+      };
+    }
+    const lado = tipo === TipoVinculo.NUTRICAO ? "nutricionista" : "personal";
+    return { sucesso: false, erro: `esse cliente já tem ${lado} — ele precisa encerrar o vínculo atual antes` };
+  }
+
+  await prismaNutri.vinculo.create({
+    data: { clienteId: cliente.id, profissionalId: profissional.id, tipo, status: StatusVinculo.PENDENTE },
+  });
+
+  revalidatePath("/pro");
+  revalidatePath(`/p/${cliente.tokenAcesso}`);
+  return { sucesso: true, nome: cliente.nome };
 }
 
 /** Nova versão do plano nutricional; a anterior fica como histórico. */

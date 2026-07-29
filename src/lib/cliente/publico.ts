@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { prismaNutri } from "@/lib/nutri/prisma";
 import {
   StatusCliente,
+  StatusVinculo,
   favoritoSchema,
   registrarPesoSchema,
   registrarSchema,
   removerFavoritoSchema,
   tokenSchema,
+  vinculoDoClienteSchema,
 } from "@/lib/cliente/schemas";
 
 export type ResultadoAcaoPublica = { sucesso: true } | { sucesso: false; erro: string };
@@ -34,6 +36,93 @@ export async function aceitarConsentimento(input: unknown): Promise<ResultadoAca
   await prismaNutri.cliente.update({ where: { id: cliente.id }, data: { consentimentoEm: new Date() } });
 
   revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Resolve um vínculo a partir do token do cliente. O vinculoId sozinho
+ * nunca basta: o filtro por clienteId é o que impede alguém responder por
+ * um vínculo que não é dele.
+ */
+async function vinculoDoCliente(input: unknown, statusEsperado: StatusVinculo) {
+  const parsed = vinculoDoClienteSchema.safeParse(input);
+  if (!parsed.success) return null;
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return null;
+
+  const vinculo = await prismaNutri.vinculo.findFirst({
+    where: { id: parsed.data.vinculoId, clienteId: cliente.id, status: statusEsperado },
+  });
+  if (!vinculo) return null;
+
+  return { cliente, vinculo, token: parsed.data.token };
+}
+
+/**
+ * O cliente libera o acompanhamento. É aqui que o dado dele passa a ser
+ * visível pra esse profissional — por isso a ação é dele, e não de quem
+ * pediu.
+ */
+export async function aceitarVinculo(input: unknown): Promise<ResultadoAcaoPublica> {
+  const alvo = await vinculoDoCliente(input, StatusVinculo.PENDENTE);
+  if (!alvo) return { sucesso: false, erro: "solicitação não encontrada" };
+
+  // O limite do plano foi conferido quando o profissional pediu, mas pode
+  // ter estourado desde então — quem paga é ele, então a vaga é conferida
+  // de novo na hora que o vínculo de fato passa a valer.
+  const profissional = await prismaNutri.profissional.findUnique({ where: { id: alvo.vinculo.profissionalId } });
+  if (!profissional) return { sucesso: false, erro: "profissional não encontrado" };
+
+  const ativos = await prismaNutri.vinculo.count({
+    where: { profissionalId: profissional.id, status: StatusVinculo.ATIVO },
+  });
+  if (ativos >= profissional.limitePlano) {
+    return { sucesso: false, erro: "o plano desse profissional está cheio — peça pra ele liberar uma vaga" };
+  }
+
+  await prismaNutri.vinculo.update({
+    where: { id: alvo.vinculo.id },
+    data: { status: StatusVinculo.ATIVO, aceitoEm: new Date() },
+  });
+
+  revalidatePath(`/p/${alvo.token}`);
+  revalidatePath("/pro");
+  return { sucesso: true };
+}
+
+/** Recusar é encerrar antes de começar — a linha fica como registro. */
+export async function recusarVinculo(input: unknown): Promise<ResultadoAcaoPublica> {
+  const alvo = await vinculoDoCliente(input, StatusVinculo.PENDENTE);
+  if (!alvo) return { sucesso: false, erro: "solicitação não encontrada" };
+
+  await prismaNutri.vinculo.update({
+    where: { id: alvo.vinculo.id },
+    data: { status: StatusVinculo.ENCERRADO },
+  });
+
+  revalidatePath(`/p/${alvo.token}`);
+  revalidatePath("/pro");
+  return { sucesso: true };
+}
+
+/**
+ * O cliente encerra um acompanhamento em andamento. Nunca arquiva a
+ * pessoa, mesmo se não sobrar nenhum vínculo: arquivar tiraria dele o
+ * acesso à própria página — o oposto do que ele pediu. Os registros ficam;
+ * o profissional é que perde o acesso.
+ */
+export async function encerrarVinculo(input: unknown): Promise<ResultadoAcaoPublica> {
+  const alvo = await vinculoDoCliente(input, StatusVinculo.ATIVO);
+  if (!alvo) return { sucesso: false, erro: "acompanhamento não encontrado" };
+
+  await prismaNutri.vinculo.update({
+    where: { id: alvo.vinculo.id },
+    data: { status: StatusVinculo.ENCERRADO },
+  });
+
+  revalidatePath(`/p/${alvo.token}`);
+  revalidatePath("/pro");
   return { sucesso: true };
 }
 

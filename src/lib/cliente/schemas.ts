@@ -153,3 +153,25 @@ export const favoritoSchema = tokenSchema.extend({
 export const removerFavoritoSchema = tokenSchema.extend({
   favoritoId: z.string().min(1),
 });
+
+/** Mesmo alfabeto de gerarCodigoConvite — sem 0/O e 1/I. */
+const ALFABETO_CONVITE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
+
+/**
+ * Profissional pedindo acompanhamento de um cliente que já existe. O
+ * código chega digitado à mão, então normaliza antes de validar: espaço
+ * sobrando e minúscula são erro de digitação, não código errado.
+ */
+export const solicitarVinculoSchema = z.object({
+  codigoConvite: z
+    .string()
+    .trim()
+    .transform((v) => v.toUpperCase().replace(/[\s-]/g, ""))
+    .refine((v) => ALFABETO_CONVITE.test(v), { message: "o código tem 6 letras e números" }),
+  tipo: z.nativeEnum(TipoVinculo),
+});
+
+/** Cliente respondendo sobre um vínculo seu — aceitar, recusar ou encerrar. */
+export const vinculoDoClienteSchema = tokenSchema.extend({
+  vinculoId: z.string().min(1),
+});

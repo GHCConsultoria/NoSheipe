@@ -333,7 +333,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS "clientes_tokenAcesso_key" ON "clientes"("toke
 CREATE UNIQUE INDEX IF NOT EXISTS "clientes_codigoConvite_key" ON "clientes"("codigoConvite");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "vinculos_clienteId_tipo_key" ON "vinculos"("clienteId", "tipo");
+-- Fase 2 criou este índice como unique simples, o que impedia guardar o
+-- histórico: trocar de nutricionista exigiria sobrescrever a linha do
+-- anterior. Substituído pelo índice parcial logo abaixo. DROP é seguro e
+-- idempotente — se já foi trocado, não existe mais nada pra derrubar.
+DROP INDEX IF EXISTS "vinculos_clienteId_tipo_key";
+
+-- CreateIndex
+-- A regra "um nutricionista e um personal por cliente" vale só entre
+-- vínculos vivos. Encerrados ficam para sempre, quantos forem, como
+-- registro de quem atendeu quem. SQLite suporta índice parcial, coisa que
+-- o Prisma não sabe declarar no schema, então mora aqui.
+CREATE UNIQUE INDEX IF NOT EXISTS "vinculos_cliente_tipo_vivo"
+    ON "vinculos"("clienteId", "tipo") WHERE "status" <> 'ENCERRADO';
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "vinculos_clienteId_tipo_idx" ON "vinculos"("clienteId", "tipo");
 
 -- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "refeicoes_clienteRegistroId_key" ON "refeicoes"("clienteRegistroId");
