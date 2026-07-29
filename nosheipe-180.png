@@ -1,0 +1,104 @@
+// Schema separado do módulo NoSheipe — banco próprio (Turso/libSQL), distinto
+// do Postgres/Supabase do sistema jurídico em ../schema.prisma. Os dois
+// produtos vivem no mesmo repositório mas não compartilham banco nem client
+// Prisma; ver src/lib/nutri/prisma.ts.
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "./generated"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  // SQLite é o dialeto do Turso (libSQL) — a conexão de verdade em runtime
+  // usa o client libSQL + adapter (ver src/lib/nutri/prisma.ts), não esta
+  // URL diretamente; ela só precisa existir pro `prisma db push` da CLI.
+  provider = "sqlite"
+  url      = env("TURSO_DATABASE_URL")
+}
+
+model Nutricionista {
+  id String @id @default(cuid())
+
+  // id do usuário no Supabase Auth (auth.users.id) — continuamos usando o
+  // Supabase só como serviço de autenticação (GoTrue), independente de
+  // onde os dados da aplicação ficam guardados.
+  authUserId String @unique
+  nome       String
+  email      String @unique
+  crn        String?
+  // Limite do plano demo (R$ 99,90) — sem gateway de pagamento neste MVP,
+  // só a trava de quantidade em criarPaciente.
+  limitePlano Int   @default(20)
+
+  pacientes Paciente[]
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@map("nutricionistas")
+}
+
+model Paciente {
+  id String @id @default(cuid())
+
+  nutricionista   Nutricionista @relation(fields: [nutricionistaId], references: [id])
+  nutricionistaId String
+
+  nome     String
+  telefone String?
+
+  // Token opaco do link público (/p/[token]) — acesso do paciente sem senha.
+  tokenAcesso String @unique
+
+  metaKcal     Int
+  metaProteina Int
+  metaCarbo    Int
+  metaGordura  Int
+
+  // LGPD: null até o paciente aceitar o consentimento na primeira visita à
+  // própria página — sem isso o registro de refeição não libera.
+  consentimentoEm DateTime?
+
+  // SQLite/Turso não tem enum nativo — Prisma recusa `enum` neste provider.
+  // Valores válidos: "ATIVO" | "ARQUIVADO" (ver src/lib/nutri/schemas.ts).
+  status String @default("ATIVO")
+
+  registros RegistroRefeicao[]
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@map("pacientes")
+}
+
+model RegistroRefeicao {
+  id String @id @default(cuid())
+
+  paciente   Paciente @relation(fields: [pacienteId], references: [id])
+  pacienteId String
+
+  // UUID gerado pelo client — dedupe idempotente (reprocessar o mesmo envio
+  // nunca duplica o registro).
+  clienteRegistroId String @unique
+
+  // Valores válidos: "AUDIO" | "TEXTO" — ver nota de enum acima.
+  origem       String
+  entradaBruta String // texto digitado ou transcrição do áudio
+  // SQLite/Turso não suporta o tipo Json do Prisma — serializado manualmente
+  // (ver src/app/api/nutri/registros/route.ts). Formato:
+  // [{ nome, gramas, kcal, proteina, carbo, gordura }]
+  itens String
+
+  kcal     Int
+  proteina Int
+  carbo    Int
+  gordura  Int
+  // 0..1 devolvido pela IA — é estimativa, nunca fato; rotulado como tal na UI.
+  confianca Float
+
+  registradoEm DateTime @default(now())
+  criadoEm     DateTime @default(now())
+
+  @@map("registros_refeicao")
+}
