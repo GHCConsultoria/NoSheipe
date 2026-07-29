@@ -23,6 +23,20 @@ async function seedNutricionistaDemo() {
   });
 }
 
+// Personal trainer demo, mesmo padrão do nutricionista demo — pra
+// src/lib/personal/auth.ts ter o que resolver sem Supabase configurado.
+async function seedPersonalTrainerDemo() {
+  return prismaNutri.personalTrainer.upsert({
+    where: { authUserId: "demo-personal-trainer-auth-id" },
+    update: {},
+    create: {
+      authUserId: "demo-personal-trainer-auth-id",
+      nome: "Personal Trainer Demo",
+      email: "personal.demo@example.com",
+    },
+  });
+}
+
 const horasAtras = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
 const diasAtras = (d: number, h: number) => new Date(Date.now() - (d * 24 + h) * 60 * 60 * 1000);
 
@@ -241,9 +255,144 @@ async function seedPacientesFake(nutricionistaId: string) {
   }
 }
 
-seedNutricionistaDemo()
-  .then((nutricionista) => seedPacientesFake(nutricionista.id))
-  .then(() => console.log(`Nutricionista demo + ${PACIENTES_FAKE.length} pacientes fake semeados no Turso.`))
+interface RegistroTreinoFake {
+  clienteRegistroId: string;
+  origem: "AUDIO" | "TEXTO";
+  entradaBruta: string;
+  realizadoEm: Date;
+}
+
+interface AlunoFake {
+  tokenAcesso: string;
+  nome: string;
+  telefone?: string;
+  comConsentimento: boolean;
+  treino?: { nome: string; descricao: string; diasPorSemana: number };
+  registros: RegistroTreinoFake[];
+}
+
+// Três perfis: um treinando dentro do esperado, um bem abaixo da meta
+// semanal (aparece "fora" no painel) e um sem consentimento ainda.
+const ALUNOS_FAKE: AlunoFake[] = [
+  {
+    tokenAcesso: "demo-joao-pereira",
+    nome: "João Pereira",
+    telefone: "11944443333",
+    comConsentimento: true,
+    treino: {
+      nome: "Treino A/B — hipertrofia",
+      descricao: "A: agachamento 4x10, leg press 3x12, cadeira extensora 3x15. B: supino 4x10, remada 4x10, puxada 3x12.",
+      diasPorSemana: 4,
+    },
+    registros: [
+      {
+        clienteRegistroId: "demo-seed-joao-treino-hoje",
+        origem: "TEXTO",
+        entradaBruta: "Treino A completo — agachamento, leg press e cadeira extensora",
+        realizadoEm: horasAtras(3),
+      },
+      {
+        clienteRegistroId: "demo-seed-joao-treino-anteontem",
+        origem: "AUDIO",
+        entradaBruta: "Treino B completo, aumentei a carga do supino",
+        realizadoEm: diasAtras(2, 2),
+      },
+    ],
+  },
+  {
+    tokenAcesso: "demo-patricia-gomes",
+    nome: "Patrícia Gomes",
+    telefone: "11933332222",
+    comConsentimento: true,
+    treino: {
+      nome: "Treino full body",
+      descricao: "Agachamento, supino, remada, elevação lateral, prancha — 3x por semana.",
+      diasPorSemana: 3,
+    },
+    registros: [
+      {
+        clienteRegistroId: "demo-seed-patricia-treino-semana-passada",
+        origem: "TEXTO",
+        entradaBruta: "Consegui fazer só metade do treino, tava sem tempo",
+        realizadoEm: diasAtras(6, 0),
+      },
+    ],
+  },
+  {
+    tokenAcesso: "demo-lucas-martins",
+    nome: "Lucas Martins",
+    telefone: "11922221111",
+    comConsentimento: false,
+    treino: {
+      nome: "Treino iniciante",
+      descricao: "Adaptação: agachamento livre, flexão, remada com elástico — 2x por semana.",
+      diasPorSemana: 2,
+    },
+    registros: [],
+  },
+];
+
+/**
+ * Alunos + treino prescrito + registros fake pra popular o painel do
+ * personal trainer demo — mesmo espírito do seedPacientesFake: um aluno
+ * com boa frequência, um abaixo da meta semanal, um sem consentimento
+ * ainda.
+ */
+async function seedAlunosFake(personalTrainerId: string) {
+  for (const alunoFake of ALUNOS_FAKE) {
+    const aluno = await prismaNutri.aluno.upsert({
+      where: { tokenAcesso: alunoFake.tokenAcesso },
+      update: {
+        consentimentoEm: alunoFake.comConsentimento ? new Date() : null,
+      },
+      create: {
+        personalTrainerId,
+        nome: alunoFake.nome,
+        telefone: alunoFake.telefone,
+        tokenAcesso: alunoFake.tokenAcesso,
+        consentimentoEm: alunoFake.comConsentimento ? new Date() : null,
+      },
+    });
+
+    if (alunoFake.treino) {
+      const treinoExistente = await prismaNutri.treino.findFirst({ where: { alunoId: aluno.id, ativo: true } });
+      if (!treinoExistente) {
+        await prismaNutri.treino.create({
+          data: {
+            alunoId: aluno.id,
+            nome: alunoFake.treino.nome,
+            descricao: alunoFake.treino.descricao,
+            diasPorSemana: alunoFake.treino.diasPorSemana,
+          },
+        });
+      }
+    }
+
+    for (const registro of alunoFake.registros) {
+      await prismaNutri.registroTreino.upsert({
+        where: { clienteRegistroId: registro.clienteRegistroId },
+        update: {},
+        create: {
+          alunoId: aluno.id,
+          clienteRegistroId: registro.clienteRegistroId,
+          origem: registro.origem,
+          entradaBruta: registro.entradaBruta,
+          realizadoEm: registro.realizadoEm,
+        },
+      });
+    }
+  }
+}
+
+Promise.all([
+  seedNutricionistaDemo().then((nutricionista) => seedPacientesFake(nutricionista.id)),
+  seedPersonalTrainerDemo().then((personalTrainer) => seedAlunosFake(personalTrainer.id)),
+])
+  .then(() =>
+    console.log(
+      `Nutricionista demo + ${PACIENTES_FAKE.length} pacientes fake e Personal Trainer demo + ${ALUNOS_FAKE.length} alunos fake semeados no Turso.`,
+    ),
+  )
   .catch((erro) => {
     console.error(erro);
     process.exitCode = 1;
