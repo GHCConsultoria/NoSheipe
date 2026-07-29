@@ -1,18 +1,28 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const ROTA_LOGIN_NUTRI = "/nutri/login";
+// Cada área profissional tem seu próprio login; o gate redireciona pra
+// tela certa em vez de sempre mandar pro /nutri/login.
+const AREAS_PROTEGIDAS = [
+  { prefixo: "/nutri", login: "/nutri/login" },
+  { prefixo: "/personal", login: "/personal/login" },
+];
 
 /**
- * Renova a sessão do Supabase a cada navegação e redireciona para
- * /nutri/login quando não há usuário autenticado. /p/[token] (link do
- * paciente, sem senha) fica de fora do gate inteiramente — o token na
- * própria URL é a credencial.
+ * Renova a sessão do Supabase a cada navegação e redireciona para o login
+ * da área correspondente quando não há usuário autenticado. Os links
+ * públicos (/p/[token] do paciente e /t/[token] do aluno) ficam de fora do
+ * gate inteiramente — o token na própria URL é a credencial.
  */
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  if (request.nextUrl.pathname.startsWith("/p/")) {
+  if (request.nextUrl.pathname.startsWith("/p/") || request.nextUrl.pathname.startsWith("/t/")) {
+    return response;
+  }
+
+  const area = AREAS_PROTEGIDAS.find(({ prefixo }) => request.nextUrl.pathname.startsWith(prefixo));
+  if (!area) {
     return response;
   }
 
@@ -45,10 +55,10 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const ehRotaDeLogin = request.nextUrl.pathname.startsWith(ROTA_LOGIN_NUTRI);
+  const ehRotaDeLogin = request.nextUrl.pathname.startsWith(area.login);
   if (!user && !ehRotaDeLogin) {
     const destino = request.nextUrl.clone();
-    destino.pathname = ROTA_LOGIN_NUTRI;
+    destino.pathname = area.login;
     return NextResponse.redirect(destino);
   }
 
