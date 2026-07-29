@@ -1,4 +1,3 @@
-import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { buscarClientePorToken, buscarPainelDoCliente } from "@/lib/cliente/consultas";
 import { ConsentimentoCliente } from "@/components/cliente/ConsentimentoCliente";
@@ -6,16 +5,8 @@ import { HomeDoCliente } from "@/components/cliente/HomeDoCliente";
 
 export const dynamic = "force-dynamic";
 
-export const viewport: Viewport = { themeColor: "#16a34a" };
-
-export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
-  return {
-    title: "NoSheipe",
-    manifest: `/p/${params.token}/manifest.json`,
-    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "NoSheipe" },
-    icons: { icon: "/icons/nosheipe-192.png", apple: "/icons/nosheipe-180.png" },
-  };
-}
+// O manifesto e o theme-color moraram aqui até virarem abas: agora estão
+// no layout, pra valerem também em /historico e /perfil.
 
 export default async function PaginaCliente({ params }: { params: { token: string } }) {
   const cliente = await buscarClientePorToken(params.token);

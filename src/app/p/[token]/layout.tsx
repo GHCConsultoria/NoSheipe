@@ -1,7 +1,25 @@
+import type { Metadata, Viewport } from "next";
 import { buscarClientePorToken, buscarResumoDaNavegacao } from "@/lib/cliente/consultas";
 import { NavRodape } from "@/components/cliente/NavRodape";
 
 export const dynamic = "force-dynamic";
+
+export const viewport: Viewport = { themeColor: "#16a34a" };
+
+/**
+ * Metadados do PWA no layout, e não na página inicial: com a navegação em
+ * abas o cliente passa a viver em /historico e /perfil também, e sem isto
+ * essas telas ficavam sem manifesto e sem theme-color — no app instalado a
+ * barra de status trocava de cor ao mudar de aba.
+ */
+export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
+  return {
+    title: "NoSheipe",
+    manifest: `/p/${params.token}/manifest.json`,
+    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "NoSheipe" },
+    icons: { icon: "/icons/nosheipe-192.png", apple: "/icons/nosheipe-180.png" },
+  };
+}
 
 /**
  * Casca das telas do cliente: conteúdo mais a barra do rodapé.
