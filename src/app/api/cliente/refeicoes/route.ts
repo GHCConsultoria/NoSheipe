@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { Prisma } from "../../../../../prisma/nutri/generated";
 import { prismaNutri } from "@/lib/nutri/prisma";
-import { OrigemRegistro, StatusPaciente } from "@/lib/nutri/schemas";
+import { StatusCliente, registrarSchema } from "@/lib/cliente/schemas";
 import { extrairMacros, IaRespostaInvalidaError, IaNaoConfiguradaError } from "@/lib/nutri/ia";
 
-const corpoSchema = z.object({
-  token: z.string().min(1),
-  clientLogId: z.string().uuid("clientLogId deve ser um UUID"),
-  rawText: z.string().trim().min(1, "descreva o que você comeu"),
-  origem: z.nativeEnum(OrigemRegistro).default(OrigemRegistro.TEXTO),
-});
-
-function serializarRegistro(registro: {
+function serializar(registro: {
   id: string;
   entradaBruta: string;
   itens: string;
@@ -37,34 +29,36 @@ function serializarRegistro(registro: {
 }
 
 /**
- * Recebe o relato de refeição do paciente (texto digitado ou transcrição de
- * áudio — os dois chegam aqui já como texto, `origem` só rotula a origem),
- * chama a IA pra extrair macros e salva. Sem sessão nenhuma: o token do
- * paciente na própria requisição é a credencial, igual ao resto da página
- * /p/[token].
+ * Recebe o relato de refeição do cliente (texto ou transcrição de áudio —
+ * os dois chegam como texto, `origem` só rotula), chama a IA pra extrair
+ * macros e salva. Sem sessão: o token na própria requisição é a
+ * credencial, igual ao resto de /p/[token].
+ *
+ * É rota de API, e não Server Action como o registro de treino, porque a
+ * chamada à IA pode demorar e aqui a resposta devolve o registro estimado.
  */
 export async function POST(request: NextRequest) {
   const corpoBruto: unknown = await request.json().catch(() => null);
-  const parsed = corpoSchema.safeParse(corpoBruto);
+  const parsed = registrarSchema.safeParse(corpoBruto);
   if (!parsed.success) {
     return NextResponse.json({ erro: parsed.error.issues[0]?.message ?? "payload inválido" }, { status: 400 });
   }
 
-  const paciente = await prismaNutri.paciente.findUnique({ where: { tokenAcesso: parsed.data.token } });
-  if (!paciente || paciente.status !== StatusPaciente.ATIVO) {
-    return NextResponse.json({ erro: "paciente não encontrado" }, { status: 404 });
+  const cliente = await prismaNutri.cliente.findUnique({ where: { tokenAcesso: parsed.data.token } });
+  if (!cliente || cliente.status !== StatusCliente.ATIVO) {
+    return NextResponse.json({ erro: "cliente não encontrado" }, { status: 404 });
   }
-  if (!paciente.consentimentoEm) {
+  if (!cliente.consentimentoEm) {
     return NextResponse.json({ erro: "consentimento obrigatório antes de registrar" }, { status: 403 });
   }
 
-  // Idempotência: reprocessar o mesmo clientLogId nunca duplica nem chama a
-  // IA de novo — devolve o registro já salvo.
-  const existente = await prismaNutri.registroRefeicao.findUnique({
+  // Idempotência: reprocessar o mesmo clientLogId não duplica nem chama a
+  // IA de novo — devolve o que já está salvo.
+  const existente = await prismaNutri.refeicao.findUnique({
     where: { clienteRegistroId: parsed.data.clientLogId },
   });
   if (existente) {
-    return NextResponse.json({ sucesso: true, registro: serializarRegistro(existente) });
+    return NextResponse.json({ sucesso: true, registro: serializar(existente) });
   }
 
   let macros;
@@ -78,9 +72,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const registro = await prismaNutri.registroRefeicao.create({
+    const registro = await prismaNutri.refeicao.create({
       data: {
-        pacienteId: paciente.id,
+        clienteId: cliente.id,
         clienteRegistroId: parsed.data.clientLogId,
         origem: parsed.data.origem,
         entradaBruta: parsed.data.rawText,
@@ -92,17 +86,16 @@ export async function POST(request: NextRequest) {
         confianca: macros.confidence,
       },
     });
-    return NextResponse.json({ sucesso: true, registro: serializarRegistro(registro) });
+    return NextResponse.json({ sucesso: true, registro: serializar(registro) });
   } catch (erro) {
-    // Corrida entre duas requisições com o mesmo clientLogId (ex.: duplo
-    // clique) — a unique constraint pegou, então o registro já existe;
-    // devolve ele em vez de propagar o erro de constraint pro client.
+    // Corrida entre dois envios com o mesmo clientLogId (duplo clique):
+    // a unique constraint pegou, então o registro já existe.
     if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2002") {
-      const jaSalvo = await prismaNutri.registroRefeicao.findUnique({
+      const jaSalvo = await prismaNutri.refeicao.findUnique({
         where: { clienteRegistroId: parsed.data.clientLogId },
       });
       if (jaSalvo) {
-        return NextResponse.json({ sucesso: true, registro: serializarRegistro(jaSalvo) });
+        return NextResponse.json({ sucesso: true, registro: serializar(jaSalvo) });
       }
     }
     throw erro;

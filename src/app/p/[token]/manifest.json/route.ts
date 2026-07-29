@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import { buscarPacientePorToken } from "@/lib/nutri/consultas";
+import { buscarClientePorToken } from "@/lib/cliente/consultas";
 
 /**
- * Manifesto PWA por paciente — instalar na tela inicial abre direto no
- * link daquele paciente (start_url/scope presos ao token), não num app
+ * Manifesto PWA por cliente — instalar na tela inicial abre direto no
+ * link daquele cliente (start_url/scope presos ao token), não num app
  * genérico. Content-type próprio pra o navegador reconhecer como manifest.
  */
 export async function GET(_request: Request, { params }: { params: { token: string } }) {
-  const paciente = await buscarPacientePorToken(params.token);
-  const nome = paciente ? paciente.nome : "NoSheipe";
+  const cliente = await buscarClientePorToken(params.token);
+  const nome = cliente ? cliente.nome : "NoSheipe";
 
   return NextResponse.json(
     {

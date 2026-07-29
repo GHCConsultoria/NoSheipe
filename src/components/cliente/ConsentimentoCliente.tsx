@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { aceitarConsentimentoAluno } from "@/lib/personal/publico";
+import { aceitarConsentimento } from "@/lib/cliente/publico";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 
-export function ConsentimentoAluno({ token, nomeAluno }: { token: string; nomeAluno: string }) {
+export function ConsentimentoCliente({ token, nome }: { token: string; nome: string }) {
   const router = useRouter();
   const [aceito, setAceito] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -15,7 +15,7 @@ export function ConsentimentoAluno({ token, nomeAluno }: { token: string; nomeAl
     if (!aceito) return;
     setErro(null);
     iniciarTransicao(async () => {
-      const resultado = await aceitarConsentimentoAluno({ token });
+      const resultado = await aceitarConsentimento({ token });
       if (!resultado.sucesso) {
         setErro(resultado.erro);
         return;
@@ -30,22 +30,17 @@ export function ConsentimentoAluno({ token, nomeAluno }: { token: string; nomeAl
         <div className="mb-3">
           <NoSheipeLogo size={24} />
         </div>
-        <h1 className="font-display text-2xl">Olá, {nomeAluno}</h1>
+        <h1 className="font-display text-2xl">Olá, {nome}</h1>
         <p className="mt-2 text-sm text-ink-soft">
-          Antes de registrar seus treinos, precisamos do seu consentimento pra tratar esse dado (LGPD).
+          Antes de registrar qualquer coisa, precisamos do seu consentimento pra tratar esse dado de saúde (LGPD).
         </p>
       </div>
 
       <label className="flex items-start gap-3 text-sm">
-        <input
-          type="checkbox"
-          checked={aceito}
-          onChange={(evento) => setAceito(evento.target.checked)}
-          className="mt-1"
-        />
+        <input type="checkbox" checked={aceito} onChange={(e) => setAceito(e.target.checked)} className="mt-1" />
         <span>
-          Autorizo o registro dos treinos que eu informar aqui e seu uso pelo meu personal trainer para acompanhar
-          minha frequência.
+          Autorizo o registro do que eu informar aqui e seu uso pelos profissionais que me acompanham, para
+          acompanhar minha aderência ao que eles definiram.
         </span>
       </label>
 

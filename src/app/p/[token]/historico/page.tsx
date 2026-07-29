@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
-import { buscarPacientePorToken, buscarHistoricoDeDias } from "@/lib/nutri/consultas";
+import { buscarClientePorToken, buscarHistoricoDeDias } from "@/lib/cliente/consultas";
 import { estaForaDaMeta } from "@/lib/nutri/aderencia";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 
@@ -14,13 +14,13 @@ const FORMATADOR_DIA = new Intl.DateTimeFormat("pt-BR", {
   month: "2-digit",
 });
 
-export default async function HistoricoPaciente({ params }: { params: { token: string } }) {
-  const paciente = await buscarPacientePorToken(params.token);
-  if (!paciente || !paciente.consentimentoEm) {
+export default async function HistoricoCliente({ params }: { params: { token: string } }) {
+  const cliente = await buscarClientePorToken(params.token);
+  if (!cliente || !cliente.consentimentoEm) {
     notFound();
   }
 
-  const historico = await buscarHistoricoDeDias(paciente.id);
+  const historico = await buscarHistoricoDeDias(cliente.id);
 
   return (
     <main className="mx-auto max-w-md px-6 py-10">
