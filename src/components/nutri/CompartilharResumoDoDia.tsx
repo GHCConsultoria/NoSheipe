@@ -75,10 +75,18 @@ function gerarImagemResumoDoDia(nomePaciente: string, saldo: Saldo): Promise<Blo
   ctx.fillRect(0, 0, largura, altura);
   ctx.textBaseline = "alphabetic";
 
-  ctx.fillStyle = corSheipe;
+  ctx.strokeStyle = "#1c3326";
+  ctx.lineWidth = 7;
   ctx.beginPath();
   ctx.arc(100, 96, 20, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = corSheipe;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(100, 96, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * 0.74);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+
   ctx.fillStyle = corInk;
   ctx.font = "600 32px system-ui, sans-serif";
   ctx.fillText("NoSheipe", 136, 106);
