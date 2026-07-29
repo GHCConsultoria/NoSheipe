@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { obterNutricionistaAtual } from "@/lib/nutri/auth";
 import { buscarPacientesComAderencia } from "@/lib/nutri/consultas";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
@@ -41,9 +42,9 @@ export default async function PainelNutri() {
         {vagasRestantes > 0 ? (
           <Link
             href="/nutri/pacientes/novo"
-            className="inline-block rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep"
+            className="inline-flex items-center gap-1.5 rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep"
           >
-            + Novo paciente
+            <Plus size={15} strokeWidth={2} /> Novo paciente
           </Link>
         ) : (
           <p className="text-sm text-urgent">

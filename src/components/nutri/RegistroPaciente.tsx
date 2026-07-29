@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { Mic, Square } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "./useReconhecimentoDeFala";
 import { NoSheipeLogo } from "./NoSheipeLogo";
 import { CompartilharResumoDoDia } from "./CompartilharResumoDoDia";
@@ -123,13 +124,21 @@ export function RegistroPaciente({ token, nomePaciente, saldo, registros }: Prop
           <button
             type="button"
             onClick={alternarGravacao}
-            className={`self-start rounded-sm border px-3 py-1.5 text-xs transition-colors ${
+            className={`inline-flex items-center gap-1.5 self-start rounded-sm border px-3 py-1.5 text-xs transition-colors ${
               gravando
                 ? "border-urgent-line text-urgent"
                 : "border-rule text-ink-soft hover:border-sheipe hover:text-ink"
             }`}
           >
-            {gravando ? "⏹ Parar gravação" : "🎙️ Gravar áudio"}
+            {gravando ? (
+              <>
+                <Square size={13} strokeWidth={2} fill="currentColor" /> Parar gravação
+              </>
+            ) : (
+              <>
+                <Mic size={13} strokeWidth={1.75} /> Gravar áudio
+              </>
+            )}
           </button>
         )}
         {erroFala && <p className="text-sm text-urgent">{erroFala}</p>}

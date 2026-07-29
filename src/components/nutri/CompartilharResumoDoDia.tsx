@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Share2 } from "lucide-react";
 
 interface SaldoMacro {
   consumido: number;
@@ -184,9 +185,10 @@ export function CompartilharResumoDoDia({ nomePaciente, saldo }: Props) {
         type="button"
         onClick={compartilhar}
         disabled={gerando}
-        className="self-start rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 self-start rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink disabled:opacity-50"
       >
-        {gerando ? "Gerando…" : "📤 Compartilhar resumo do dia"}
+        <Share2 size={13} strokeWidth={1.75} />
+        {gerando ? "Gerando…" : "Compartilhar resumo do dia"}
       </button>
       {erro && <p className="text-xs text-urgent">{erro}</p>}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 import { CHAVE_TEMA } from "@/lib/nutri/tema";
 
 export function ThemeToggle() {
@@ -28,9 +29,9 @@ export function ThemeToggle() {
       onClick={alternar}
       aria-label="Alternar tema claro/escuro"
       title="Alternar tema claro/escuro"
-      className="fixed bottom-4 right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-rule bg-paper-raised text-sm shadow-sm transition-colors hover:border-sheipe"
+      className="fixed bottom-4 right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-rule bg-paper-raised text-ink-soft shadow-sm transition-colors hover:border-sheipe hover:text-ink"
     >
-      {tema === "dark" ? "☀️" : "🌙"}
+      {tema === "dark" ? <Sun size={16} strokeWidth={1.75} /> : <Moon size={16} strokeWidth={1.75} />}
     </button>
   );
 }
