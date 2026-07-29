@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "./useReconhecimentoDeFala";
 import { NoSheipeLogo } from "./NoSheipeLogo";
+import { CompartilharResumoDoDia } from "./CompartilharResumoDoDia";
 
 interface RegistroExibicao {
   id: string;
@@ -98,6 +99,10 @@ export function RegistroPaciente({ token, nomePaciente, saldo, registros }: Prop
         <CartaoMacro rotulo="Carbo (g)" saldo={saldo.carbo} />
         <CartaoMacro rotulo="Gordura (g)" saldo={saldo.gordura} />
       </section>
+
+      <div className="mt-4">
+        <CompartilharResumoDoDia nomePaciente={nomePaciente} saldo={saldo} />
+      </div>
 
       <form onSubmit={registrar} className="paper-card mt-8 flex flex-col gap-3 rounded-sm p-4">
         <label className="text-sm">
