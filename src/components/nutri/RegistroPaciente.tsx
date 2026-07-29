@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Mic, Square } from "lucide-react";
-import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "./useReconhecimentoDeFala";
+import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
 import { NoSheipeLogo } from "./NoSheipeLogo";
 import { CompartilharResumoDoDia } from "./CompartilharResumoDoDia";
 
