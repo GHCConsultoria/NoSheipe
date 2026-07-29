@@ -6,7 +6,8 @@
 // configurado no client em runtime. O adapter só vale pra o PrismaClient da
 // aplicação (src/lib/nutri/prisma.ts); pra aplicar o schema em si, a via é
 // executar o SQL manualmente com o client libSQL puro. init.sql usa
-// "IF NOT EXISTS" em tudo, então rodar de novo em cada deploy é seguro.
+// "IF NOT EXISTS" em tudo que suporta, então rodar de novo em cada deploy é
+// seguro — ver a exceção do ALTER TABLE mais abaixo.
 import { createClient } from "@libsql/client";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -34,9 +35,32 @@ const statements = sql
   )
   .filter((s) => s.length > 0);
 
-for (const stmt of statements) {
-  await client.execute(stmt);
+// O SQLite não tem "ADD COLUMN IF NOT EXISTS", e este script roda em todo
+// build — então um ALTER TABLE que adiciona coluna falha da segunda vez em
+// diante com "duplicate column name". Esse erro específico significa "já
+// aplicado", que é exatamente o estado desejado, então é ignorado. Qualquer
+// outro erro continua estourando: a intenção é ser idempotente, não
+// silencioso.
+function ehColunaJaExistente(erro) {
+  return /duplicate column name/i.test(erro instanceof Error ? erro.message : String(erro));
 }
 
-console.log(`Schema do NoSheipe aplicado no Turso (${statements.length} statements).`);
+let aplicados = 0;
+let jaExistentes = 0;
+
+for (const stmt of statements) {
+  try {
+    await client.execute(stmt);
+    aplicados += 1;
+  } catch (erro) {
+    if (ehColunaJaExistente(erro)) {
+      jaExistentes += 1;
+      continue;
+    }
+    throw erro;
+  }
+}
+
+const detalheJaExistentes = jaExistentes > 0 ? ` (${jaExistentes} coluna(s) já existiam)` : "";
+console.log(`Schema do NoSheipe aplicado no Turso (${aplicados} statements)${detalheJaExistentes}.`);
 client.close();

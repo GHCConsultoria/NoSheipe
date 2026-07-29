@@ -8,33 +8,54 @@ const libsql = createClient({
 });
 const prismaNutri = new PrismaClient({ adapter: new PrismaLibSQL(libsql) });
 
-// Nutricionista demo, pra src/lib/nutri/auth.ts ter o que resolver quando
-// Supabase não está configurado (navegação local de /nutri sem credenciais
-// reais) — mesmo padrão do advogado demo do sistema jurídico.
-async function seedNutricionistaDemo() {
-  return prismaNutri.nutricionista.upsert({
-    where: { authUserId: "demo-nutricionista-auth-id" },
-    update: {},
+/**
+ * Profissional demo — híbrido de propósito (nutricionista E personal), pra
+ * src/lib/profissional/auth.ts ter o que resolver quando o Supabase não
+ * está configurado, e pra o painel unificado ser exercitado no seu caso
+ * mais completo (as duas seções visíveis ao mesmo tempo).
+ */
+async function seedProfissionalDemo() {
+  return prismaNutri.profissional.upsert({
+    where: { authUserId: "demo-profissional-auth-id" },
+    update: { ehNutricionista: true, ehPersonal: true },
     create: {
-      authUserId: "demo-nutricionista-auth-id",
-      nome: "Nutricionista Demo",
-      email: "nutricionista.demo@example.com",
+      authUserId: "demo-profissional-auth-id",
+      nome: "Profissional Demo",
+      email: "profissional.demo@example.com",
+      ehNutricionista: true,
+      ehPersonal: true,
+      crn: "CRN-0000",
+      cref: "CREF-0000",
     },
   });
 }
 
-// Personal trainer demo, mesmo padrão do nutricionista demo — pra
-// src/lib/personal/auth.ts ter o que resolver sem Supabase configurado.
-async function seedPersonalTrainerDemo() {
-  return prismaNutri.personalTrainer.upsert({
-    where: { authUserId: "demo-personal-trainer-auth-id" },
-    update: {},
-    create: {
-      authUserId: "demo-personal-trainer-auth-id",
-      nome: "Personal Trainer Demo",
-      email: "personal.demo@example.com",
-    },
-  });
+// Nutricionista/PersonalTrainer demo obsoletos: os models antigos ainda
+// existem no schema (nenhuma exclusão física), e Paciente.nutricionistaId /
+// Aluno.personalTrainerId continuam NOT NULL, então o seed precisa de uma
+// linha em cada só pra satisfazer a FK. Nenhum código novo os lê.
+async function seedDonosLegados() {
+  const [nutricionista, personalTrainer] = await Promise.all([
+    prismaNutri.nutricionista.upsert({
+      where: { authUserId: "demo-nutricionista-auth-id" },
+      update: {},
+      create: {
+        authUserId: "demo-nutricionista-auth-id",
+        nome: "Nutricionista Demo (legado)",
+        email: "nutricionista.demo@example.com",
+      },
+    }),
+    prismaNutri.personalTrainer.upsert({
+      where: { authUserId: "demo-personal-trainer-auth-id" },
+      update: {},
+      create: {
+        authUserId: "demo-personal-trainer-auth-id",
+        nome: "Personal Trainer Demo (legado)",
+        email: "personal.demo@example.com",
+      },
+    }),
+  ]);
+  return { nutricionistaId: nutricionista.id, personalTrainerId: personalTrainer.id };
 }
 
 const horasAtras = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
@@ -210,15 +231,19 @@ const PACIENTES_FAKE: PacienteFake[] = [
  * quando o nutricionista demo é usado (sem Supabase configurado), então não
  * risca dados reais de produção.
  */
-async function seedPacientesFake(nutricionistaId: string) {
+async function seedPacientesFake(profissionalId: string, nutricionistaId: string) {
   for (const pacienteFake of PACIENTES_FAKE) {
     const paciente = await prismaNutri.paciente.upsert({
       where: { tokenAcesso: pacienteFake.tokenAcesso },
       update: {
+        // profissionalId no update também: reapontar pacientes que já
+        // existiam antes da unificação pro dono novo.
+        profissionalId,
         status: pacienteFake.arquivado ? "ARQUIVADO" : "ATIVO",
         consentimentoEm: pacienteFake.comConsentimento ? new Date() : null,
       },
       create: {
+        profissionalId,
         nutricionistaId,
         nome: pacienteFake.nome,
         telefone: pacienteFake.telefone,
@@ -369,14 +394,17 @@ const ALUNOS_FAKE: AlunoFake[] = [
  * com boa frequência, um abaixo da meta semanal, um sem consentimento
  * ainda.
  */
-async function seedAlunosFake(personalTrainerId: string) {
+async function seedAlunosFake(profissionalId: string, personalTrainerId: string) {
   for (const alunoFake of ALUNOS_FAKE) {
     const aluno = await prismaNutri.aluno.upsert({
       where: { tokenAcesso: alunoFake.tokenAcesso },
       update: {
+        // Ver nota em seedPacientesFake sobre reapontar o dono.
+        profissionalId,
         consentimentoEm: alunoFake.comConsentimento ? new Date() : null,
       },
       create: {
+        profissionalId,
         personalTrainerId,
         nome: alunoFake.nome,
         telefone: alunoFake.telefone,
@@ -415,15 +443,22 @@ async function seedAlunosFake(personalTrainerId: string) {
   }
 }
 
-Promise.all([
-  seedNutricionistaDemo().then((nutricionista) => seedPacientesFake(nutricionista.id)),
-  seedPersonalTrainerDemo().then((personalTrainer) => seedAlunosFake(personalTrainer.id)),
-])
-  .then(() =>
-    console.log(
-      `Nutricionista demo + ${PACIENTES_FAKE.length} pacientes fake e Personal Trainer demo + ${ALUNOS_FAKE.length} alunos fake semeados no Turso.`,
-    ),
-  )
+// Um profissional demo híbrido é dono tanto dos pacientes quanto dos alunos
+// — assim o painel unificado aparece no seu caso mais completo. Sequencial
+// porque pacientes e alunos dependem dos ids criados antes.
+async function semear() {
+  const profissional = await seedProfissionalDemo();
+  const legados = await seedDonosLegados();
+
+  await seedPacientesFake(profissional.id, legados.nutricionistaId);
+  await seedAlunosFake(profissional.id, legados.personalTrainerId);
+
+  console.log(
+    `Profissional demo (nutri + personal) com ${PACIENTES_FAKE.length} pacientes e ${ALUNOS_FAKE.length} alunos fake semeados no Turso.`,
+  );
+}
+
+semear()
   .catch((erro) => {
     console.error(erro);
     process.exitCode = 1;
