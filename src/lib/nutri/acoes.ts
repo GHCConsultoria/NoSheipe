@@ -4,7 +4,13 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prismaNutri } from "@/lib/nutri/prisma";
 import { obterNutricionistaAtual } from "@/lib/nutri/auth";
-import { StatusPaciente, criarPacienteSchema, atualizarMetasSchema, pacienteIdSchema } from "@/lib/nutri/schemas";
+import {
+  StatusPaciente,
+  criarPacienteSchema,
+  atualizarMetasSchema,
+  pacienteIdSchema,
+  anotacaoSchema,
+} from "@/lib/nutri/schemas";
 
 export type ResultadoAcaoNutri = { sucesso: true } | { sucesso: false; erro: string };
 export type ResultadoToken = { sucesso: true; token: string } | { sucesso: false; erro: string };
@@ -134,5 +140,28 @@ export async function arquivarPaciente(input: unknown): Promise<ResultadoAcaoNut
   await prismaNutri.paciente.update({ where: { id: paciente.id }, data: { status: StatusPaciente.ARQUIVADO } });
 
   revalidatePath("/nutri");
+  return { sucesso: true };
+}
+
+/**
+ * Anotação privada do nutricionista sobre o paciente. Só-adição: não tem
+ * editar nem apagar de propósito — observação de consulta é registro
+ * histórico, mesmo espírito de auditoria do resto do domínio.
+ */
+export async function adicionarAnotacao(input: unknown): Promise<ResultadoAcaoNutri> {
+  const parsed = anotacaoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+
+  const nutricionista = await obterNutricionistaAtual();
+  const paciente = await buscarPacienteDoNutricionista(parsed.data.pacienteId, nutricionista.id);
+  if (!paciente) {
+    return { sucesso: false, erro: "paciente não encontrado" };
+  }
+
+  await prismaNutri.anotacaoPaciente.create({ data: { pacienteId: paciente.id, texto: parsed.data.texto } });
+
+  revalidatePath(`/nutri/pacientes/${paciente.id}`);
   return { sucesso: true };
 }

@@ -1,6 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
-import { buscarPacientePorToken, buscarRegistrosDeHoje } from "@/lib/nutri/consultas";
+import {
+  buscarPacientePorToken,
+  buscarRegistrosDeHoje,
+  buscarFavoritos,
+  buscarHistoricoDePeso,
+} from "@/lib/nutri/consultas";
 import { calcularSaldoDoDia } from "@/lib/nutri/aderencia";
 import { ConsentimentoPaciente } from "@/components/nutri/ConsentimentoPaciente";
 import { RegistroPaciente } from "@/components/nutri/RegistroPaciente";
@@ -39,14 +44,21 @@ export default async function PaginaPaciente({ params }: { params: { token: stri
     return <ConsentimentoPaciente token={paciente.tokenAcesso} nomePaciente={paciente.nome} />;
   }
 
-  const registros = await buscarRegistrosDeHoje(paciente.id);
+  const [registros, favoritos, historicoDePeso] = await Promise.all([
+    buscarRegistrosDeHoje(paciente.id),
+    buscarFavoritos(paciente.id),
+    buscarHistoricoDePeso(paciente.id),
+  ]);
   const saldo = calcularSaldoDoDia(registros, paciente);
+  const pesoAtual = historicoDePeso.at(-1)?.pesoKg ?? null;
 
   return (
     <RegistroPaciente
       token={paciente.tokenAcesso}
       nomePaciente={paciente.nome}
       saldo={saldo}
+      favoritos={favoritos.map((favorito) => ({ id: favorito.id, descricao: favorito.descricao }))}
+      pesoAtual={pesoAtual}
       registros={registros.map((registro) => ({
         id: registro.id,
         entradaBruta: registro.entradaBruta,

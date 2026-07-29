@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { obterNutricionistaAtual } from "@/lib/nutri/auth";
 import { buscarPacientesComAderencia } from "@/lib/nutri/consultas";
+import { estaSemRegistroHaMuitoTempo } from "@/lib/nutri/aderencia";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { sairNutricionista } from "../login/actions";
 
@@ -54,29 +55,35 @@ export default async function PainelNutri() {
       </div>
 
       <ul className="mt-8 flex flex-col gap-3">
-        {pacientesComAderencia.map(({ paciente, saldoHoje, saldoSemana, foraDaMeta }) => (
-          <li key={paciente.id}>
-            <Link
-              href={`/nutri/pacientes/${paciente.id}`}
-              className={`paper-card block rounded-sm p-4 transition-colors hover:border-sheipe ${
-                foraDaMeta ? "border-l-[3px] border-l-urgent-line" : ""
-              }`}
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="font-display text-lg leading-snug">{paciente.nome}</p>
-                {foraDaMeta && <span className="eyebrow shrink-0 text-urgent">fora da meta</span>}
-              </div>
-              <p className="mt-1 text-xs text-ink-faint">
-                Meta: {paciente.metaKcal} kcal · {paciente.metaProteina}g P · {paciente.metaCarbo}g C ·{" "}
-                {paciente.metaGordura}g G
-              </p>
-              <div className="mt-2 flex gap-4 text-xs">
-                <span className={foraDaMeta ? "text-urgent" : "text-ink-soft"}>Hoje: {saldoHoje.kcal.percentual}%</span>
-                <span className="text-ink-soft">Semana: {saldoSemana.kcal.percentual}%</span>
-              </div>
-            </Link>
-          </li>
-        ))}
+        {pacientesComAderencia.map(({ paciente, saldoHoje, saldoSemana, foraDaMeta, diasSemRegistro }) => {
+          const sumido = estaSemRegistroHaMuitoTempo(diasSemRegistro);
+          return (
+            <li key={paciente.id}>
+              <Link
+                href={`/nutri/pacientes/${paciente.id}`}
+                className={`paper-card block rounded-sm p-4 transition-colors hover:border-sheipe ${
+                  foraDaMeta ? "border-l-[3px] border-l-urgent-line" : ""
+                }`}
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-display text-lg leading-snug">{paciente.nome}</p>
+                  {foraDaMeta && <span className="eyebrow shrink-0 text-urgent">fora da meta</span>}
+                </div>
+                <p className="mt-1 text-xs text-ink-faint">
+                  Meta: {paciente.metaKcal} kcal · {paciente.metaProteina}g P · {paciente.metaCarbo}g C ·{" "}
+                  {paciente.metaGordura}g G
+                </p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                  <span className={foraDaMeta ? "text-urgent" : "text-ink-soft"}>
+                    Hoje: {saldoHoje.kcal.percentual}%
+                  </span>
+                  <span className="text-ink-soft">Semana: {saldoSemana.kcal.percentual}%</span>
+                  {sumido && <span className="text-attention">sem registrar há {diasSemRegistro} dias</span>}
+                </div>
+              </Link>
+            </li>
+          );
+        })}
       </ul>
 
       {pacientesComAderencia.length === 0 && (

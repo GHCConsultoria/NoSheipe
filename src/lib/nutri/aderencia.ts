@@ -127,3 +127,11 @@ const FAIXA_ACEITAVEL_KCAL = { min: 70, max: 130 };
 export function estaForaDaMeta(percentualKcal: number): boolean {
   return percentualKcal < FAIXA_ACEITAVEL_KCAL.min || percentualKcal > FAIXA_ACEITAVEL_KCAL.max;
 }
+
+// A partir de quantos dias sem nenhum registro o profissional é avisado no
+// painel. Escolha de produto, igual à faixa acima.
+export const LIMIAR_DIAS_SEM_REGISTRO = 3;
+
+export function estaSemRegistroHaMuitoTempo(diasSemRegistro: number | null): boolean {
+  return diasSemRegistro !== null && diasSemRegistro >= LIMIAR_DIAS_SEM_REGISTRO;
+}

@@ -42,3 +42,8 @@ export type AtualizarMetasInput = z.infer<typeof atualizarMetasSchema>;
 export const pacienteIdSchema = z.object({
   pacienteId: z.string().min(1),
 });
+
+export const anotacaoSchema = z.object({
+  pacienteId: z.string().min(1),
+  texto: z.string().trim().min(1, "escreva a anotação"),
+});

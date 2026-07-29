@@ -2,16 +2,31 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { atualizarMetas, regenerarTokenPaciente, arquivarPaciente } from "@/lib/nutri/acoes";
+import { atualizarMetas, regenerarTokenPaciente, arquivarPaciente, adicionarAnotacao } from "@/lib/nutri/acoes";
+import { GraficoLinha } from "@/components/shared/GraficoLinha";
+
+interface Anotacao {
+  id: string;
+  texto: string;
+  data: string;
+}
+
+interface PontoDePeso {
+  valor: number;
+  rotulo: string;
+}
 
 interface Props {
   pacienteId: string;
   tokenInicial: string;
   metasIniciais: { metaKcal: number; metaProteina: number; metaCarbo: number; metaGordura: number };
+  historicoDePeso: PontoDePeso[];
+  anotacoes: Anotacao[];
 }
 
-export function EditorPaciente({ pacienteId, tokenInicial, metasIniciais }: Props) {
+export function EditorPaciente({ pacienteId, tokenInicial, metasIniciais, historicoDePeso, anotacoes }: Props) {
   const router = useRouter();
+  const [novaAnotacao, setNovaAnotacao] = useState("");
   const [metas, setMetas] = useState({
     metaKcal: String(metasIniciais.metaKcal),
     metaProteina: String(metasIniciais.metaProteina),
@@ -63,6 +78,21 @@ export function EditorPaciente({ pacienteId, tokenInicial, metasIniciais }: Prop
         return;
       }
       router.push("/nutri");
+      router.refresh();
+    });
+  }
+
+  function enviarAnotacao(evento: React.FormEvent) {
+    evento.preventDefault();
+    if (!novaAnotacao.trim()) return;
+    setErro(null);
+    iniciarTransicao(async () => {
+      const resultado = await adicionarAnotacao({ pacienteId, texto: novaAnotacao });
+      if (!resultado.sucesso) {
+        setErro(resultado.erro);
+        return;
+      }
+      setNovaAnotacao("");
       router.refresh();
     });
   }
@@ -126,6 +156,44 @@ export function EditorPaciente({ pacienteId, tokenInicial, metasIniciais }: Prop
           </button>
         </div>
       </form>
+
+      {historicoDePeso.length >= 2 && (
+        <section className="paper-card rounded-sm p-6">
+          <h2 className="eyebrow mb-4">Evolução de peso</h2>
+          <GraficoLinha pontos={historicoDePeso} sufixo=" kg" />
+        </section>
+      )}
+
+      <section className="paper-card rounded-sm p-6">
+        <h2 className="eyebrow mb-4">Anotações</h2>
+        <form onSubmit={enviarAnotacao} className="flex flex-col gap-3">
+          <textarea
+            rows={3}
+            value={novaAnotacao}
+            onChange={(evento) => setNovaAnotacao(evento.target.value)}
+            placeholder="Observação de consulta — só você vê."
+            className="w-full rounded-sm border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-sheipe"
+          />
+          <button
+            type="submit"
+            disabled={pendente || !novaAnotacao.trim()}
+            className="self-start rounded-sm border border-rule px-3 py-2 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink disabled:opacity-50"
+          >
+            {pendente ? "Salvando…" : "Adicionar anotação"}
+          </button>
+        </form>
+
+        {anotacoes.length > 0 && (
+          <ul className="mt-5 flex flex-col gap-3">
+            {anotacoes.map((anotacao) => (
+              <li key={anotacao.id} className="rounded-sm border border-rule bg-paper p-3">
+                <p className="font-data text-xs text-ink-faint">{anotacao.data}</p>
+                <p className="mt-1 text-sm whitespace-pre-wrap">{anotacao.texto}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <button
         type="button"

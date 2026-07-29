@@ -252,6 +252,37 @@ async function seedPacientesFake(nutricionistaId: string) {
         },
       });
     }
+
+    // Peso + favoritos só pra Marina, pra ter um paciente com o gráfico de
+    // evolução e os chips de refeição frequente visíveis no teste.
+    if (pacienteFake.tokenAcesso === "demo-marina-souza") {
+      const jaTemPeso = await prismaNutri.registroMedida.count({ where: { pacienteId: paciente.id } });
+      if (jaTemPeso === 0) {
+        for (const [semanasAtras, pesoKg] of [
+          [5, 74.2],
+          [4, 73.8],
+          [3, 73.1],
+          [2, 72.6],
+          [1, 72.4],
+          [0, 71.9],
+        ] as const) {
+          await prismaNutri.registroMedida.create({
+            data: { pacienteId: paciente.id, pesoKg, registradoEm: diasAtras(semanasAtras * 7, 4) },
+          });
+        }
+      }
+
+      const jaTemFavorito = await prismaNutri.refeicaoFavorita.count({ where: { pacienteId: paciente.id } });
+      if (jaTemFavorito === 0) {
+        for (const descricao of [
+          "2 fatias de pão integral com ovo mexido",
+          "150g de frango grelhado com arroz e salada",
+          "iogurte natural com granola",
+        ]) {
+          await prismaNutri.refeicaoFavorita.create({ data: { pacienteId: paciente.id, descricao } });
+        }
+      }
+    }
   }
 }
 

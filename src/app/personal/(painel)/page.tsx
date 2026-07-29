@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { obterPersonalTrainerAtual } from "@/lib/personal/auth";
 import { buscarAlunosComAderencia } from "@/lib/personal/consultas";
+import { estaSemRegistroHaMuitoTempo } from "@/lib/nutri/aderencia";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { sairPersonalTrainer } from "../login/actions";
 
@@ -54,36 +55,40 @@ export default async function PainelPersonal() {
       </div>
 
       <ul className="mt-8 flex flex-col gap-3">
-        {alunosComAderencia.map(({ aluno, treinoAtivo, aderenciaSemana, foraDoTreino }) => (
-          <li key={aluno.id}>
-            <Link
-              href={`/personal/alunos/${aluno.id}`}
-              className={`paper-card block rounded-sm p-4 transition-colors hover:border-sheipe ${
-                foraDoTreino ? "border-l-[3px] border-l-urgent-line" : ""
-              }`}
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="font-display text-lg leading-snug">{aluno.nome}</p>
-                {foraDoTreino && <span className="eyebrow shrink-0 text-urgent">fora do treino</span>}
-              </div>
-              {treinoAtivo ? (
-                <>
-                  <p className="mt-1 text-xs text-ink-faint">
-                    {treinoAtivo.nome} · meta {treinoAtivo.diasPorSemana}x/semana
-                  </p>
-                  <div className="mt-2 flex gap-4 text-xs">
-                    <span className={foraDoTreino ? "text-urgent" : "text-ink-soft"}>
-                      Semana: {aderenciaSemana?.diasTreinados}/{aderenciaSemana?.diasPorSemana} dias (
-                      {aderenciaSemana?.percentual}%)
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <p className="mt-1 text-xs text-attention">Nenhum treino prescrito ainda</p>
-              )}
-            </Link>
-          </li>
-        ))}
+        {alunosComAderencia.map(({ aluno, treinoAtivo, aderenciaSemana, foraDoTreino, diasSemRegistro }) => {
+          const sumido = estaSemRegistroHaMuitoTempo(diasSemRegistro);
+          return (
+            <li key={aluno.id}>
+              <Link
+                href={`/personal/alunos/${aluno.id}`}
+                className={`paper-card block rounded-sm p-4 transition-colors hover:border-sheipe ${
+                  foraDoTreino ? "border-l-[3px] border-l-urgent-line" : ""
+                }`}
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-display text-lg leading-snug">{aluno.nome}</p>
+                  {foraDoTreino && <span className="eyebrow shrink-0 text-urgent">fora do treino</span>}
+                </div>
+                {treinoAtivo ? (
+                  <>
+                    <p className="mt-1 text-xs text-ink-faint">
+                      {treinoAtivo.nome} · meta {treinoAtivo.diasPorSemana}x/semana
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                      <span className={foraDoTreino ? "text-urgent" : "text-ink-soft"}>
+                        Semana: {aderenciaSemana?.diasTreinados}/{aderenciaSemana?.diasPorSemana} dias (
+                        {aderenciaSemana?.percentual}%)
+                      </span>
+                      {sumido && <span className="text-attention">sem treinar há {diasSemRegistro} dias</span>}
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-1 text-xs text-attention">Nenhum treino prescrito ainda</p>
+                )}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
 
       {alunosComAderencia.length === 0 && (

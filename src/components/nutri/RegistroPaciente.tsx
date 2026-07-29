@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Mic, Square } from "lucide-react";
+import { Mic, Square, Star, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
+import { salvarFavorito, removerFavorito } from "@/lib/nutri/publico";
 import { NoSheipeLogo } from "./NoSheipeLogo";
 import { CompartilharResumoDoDia } from "./CompartilharResumoDoDia";
+import { RegistroPeso } from "./RegistroPeso";
 
 interface RegistroExibicao {
   id: string;
@@ -31,14 +34,21 @@ interface Saldo {
   gordura: SaldoMacro;
 }
 
+interface Favorito {
+  id: string;
+  descricao: string;
+}
+
 interface Props {
   token: string;
   nomePaciente: string;
   saldo: Saldo;
   registros: RegistroExibicao[];
+  favoritos: Favorito[];
+  pesoAtual: number | null;
 }
 
-export function RegistroPaciente({ token, nomePaciente, saldo, registros }: Props) {
+export function RegistroPaciente({ token, nomePaciente, saldo, registros, favoritos, pesoAtual }: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState("");
   const [origemAtual, setOrigemAtual] = useState<"TEXTO" | "AUDIO">("TEXTO");
@@ -61,6 +71,30 @@ export function RegistroPaciente({ token, nomePaciente, saldo, registros }: Prop
         setTexto(transcricao);
         setOrigemAtual("AUDIO");
       }
+    });
+  }
+
+  function favoritar() {
+    if (!texto.trim()) return;
+    setErro(null);
+    iniciarTransicao(async () => {
+      const resultado = await salvarFavorito({ token, descricao: texto });
+      if (!resultado.sucesso) {
+        setErro(resultado.erro);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function desfavoritar(favoritoId: string) {
+    iniciarTransicao(async () => {
+      const resultado = await removerFavorito({ token, favoritoId });
+      if (!resultado.sucesso) {
+        setErro(resultado.erro);
+        return;
+      }
+      router.refresh();
     });
   }
 
@@ -106,6 +140,36 @@ export function RegistroPaciente({ token, nomePaciente, saldo, registros }: Prop
       </div>
 
       <form onSubmit={registrar} className="paper-card mt-8 flex flex-col gap-3 rounded-sm p-4">
+        {favoritos.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {favoritos.map((favorito) => (
+              <span
+                key={favorito.id}
+                className="inline-flex items-center gap-1 rounded-full border border-rule py-1 pr-1 pl-2.5 text-xs text-ink-soft"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTexto(favorito.descricao);
+                    setOrigemAtual("TEXTO");
+                  }}
+                  className="transition-colors hover:text-ink"
+                >
+                  {favorito.descricao}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => desfavoritar(favorito.id)}
+                  aria-label={`Remover ${favorito.descricao} dos favoritos`}
+                  className="rounded-full p-0.5 text-ink-faint transition-colors hover:text-urgent"
+                >
+                  <X size={12} strokeWidth={2} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
         <label className="text-sm">
           <span className="eyebrow mb-1.5 block">O que você comeu?</span>
           <textarea
@@ -144,17 +208,37 @@ export function RegistroPaciente({ token, nomePaciente, saldo, registros }: Prop
         {erroFala && <p className="text-sm text-urgent">{erroFala}</p>}
         {erro && <p className="text-sm text-urgent">{erro}</p>}
 
-        <button
-          type="submit"
-          disabled={pendente || gravando || !texto.trim()}
-          className="self-start rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
-        >
-          {pendente ? "Estimando macros…" : "Registrar"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={pendente || gravando || !texto.trim()}
+            className="rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
+          >
+            {pendente ? "Estimando macros…" : "Registrar"}
+          </button>
+          <button
+            type="button"
+            onClick={favoritar}
+            disabled={pendente || !texto.trim()}
+            title="Salvar como refeição frequente"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-rule px-3 py-2 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink disabled:opacity-50"
+          >
+            <Star size={13} strokeWidth={1.75} /> Salvar
+          </button>
+        </div>
       </form>
 
+      <div className="mt-4">
+        <RegistroPeso token={token} pesoAtual={pesoAtual} />
+      </div>
+
       <section className="mt-8">
-        <h2 className="eyebrow mb-3">Hoje</h2>
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="eyebrow">Hoje</h2>
+          <Link href={`/p/${token}/historico`} className="text-xs text-ink-soft transition-colors hover:text-sheipe">
+            ver histórico
+          </Link>
+        </div>
         {registros.length === 0 && <p className="text-sm text-ink-faint">Nenhum registro ainda hoje.</p>}
         <ul className="flex flex-col gap-3">
           {registros.map((registro) => (
