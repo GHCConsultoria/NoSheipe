@@ -9,6 +9,30 @@ const libsql = createClient({
 const prismaNutri = new PrismaClient({ adapter: new PrismaLibSQL(libsql) });
 
 /**
+ * Dono dos clientes de exemplo.
+ *
+ * Por padrão é o profissional demo. Com Supabase configurado, porém, o
+ * login resolve a conta real e o demo fica inalcançável — o painel abre
+ * vazio, porque os clientes de exemplo pertencem a outro profissional.
+ *
+ * Definir DONO_DEMO_EMAIL com o e-mail de uma conta real faz os clientes
+ * de exemplo passarem pra ela, dando um painel já populado pra testar.
+ * O e-mail fica em variável de ambiente de propósito: o repositório é
+ * público. Sem a variável (ou com um e-mail que não existe), cai no demo.
+ */
+async function obterDonoDosExemplos(demo: { id: string; nome: string }) {
+  const email = process.env.DONO_DEMO_EMAIL?.trim();
+  if (!email) return demo;
+
+  const real = await prismaNutri.profissional.findUnique({ where: { email } });
+  if (!real) {
+    console.warn(`DONO_DEMO_EMAIL="${email}" nao corresponde a nenhum profissional — usando o demo.`);
+    return demo;
+  }
+  return real;
+}
+
+/**
  * Profissional demo — híbrido de propósito (nutricionista E personal), pra
  * src/lib/profissional/auth.ts ter o que resolver quando o Supabase não
  * está configurado, e pra o painel unificado ser exercitado no seu caso
@@ -447,14 +471,20 @@ async function seedAlunosFake(profissionalId: string, personalTrainerId: string)
 // — assim o painel unificado aparece no seu caso mais completo. Sequencial
 // porque pacientes e alunos dependem dos ids criados antes.
 async function semear() {
-  const profissional = await seedProfissionalDemo();
+  const demo = await seedProfissionalDemo();
   const legados = await seedDonosLegados();
 
-  await seedPacientesFake(profissional.id, legados.nutricionistaId);
-  await seedAlunosFake(profissional.id, legados.personalTrainerId);
+  // Os exemplos vão pro demo, ou pra uma conta real se DONO_DEMO_EMAIL
+  // apontar pra uma. Como os upserts abaixo também atualizam o dono, mudar
+  // a variável reaponta os exemplos no deploy seguinte — inclusive de volta
+  // pro demo, se ela for removida.
+  const dono = await obterDonoDosExemplos(demo);
+
+  await seedPacientesFake(dono.id, legados.nutricionistaId);
+  await seedAlunosFake(dono.id, legados.personalTrainerId);
 
   console.log(
-    `Profissional demo (nutri + personal) com ${PACIENTES_FAKE.length} pacientes e ${ALUNOS_FAKE.length} alunos fake semeados no Turso.`,
+    `${PACIENTES_FAKE.length} pacientes e ${ALUNOS_FAKE.length} alunos fake semeados no Turso, atribuídos a "${dono.nome}".`,
   );
 }
 
