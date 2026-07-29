@@ -2,15 +2,20 @@
 
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
-import { entrarPersonalTrainer, cadastrarPersonalTrainer, type EstadoLoginPersonal } from "./actions";
+import { entrarProfissional, cadastrarProfissional, type EstadoLoginProfissional } from "./actions";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 
-const ESTADO_INICIAL: EstadoLoginPersonal = {};
+const ESTADO_INICIAL: EstadoLoginProfissional = {};
 
-export default function LoginPersonal() {
+export default function LoginProfissional() {
   const [modo, setModo] = useState<"entrar" | "cadastrar">("entrar");
-  const [estadoEntrar, acaoEntrar] = useFormState(entrarPersonalTrainer, ESTADO_INICIAL);
-  const [estadoCadastrar, acaoCadastrar] = useFormState(cadastrarPersonalTrainer, ESTADO_INICIAL);
+  const [estadoEntrar, acaoEntrar] = useFormState(entrarProfissional, ESTADO_INICIAL);
+  const [estadoCadastrar, acaoCadastrar] = useFormState(cadastrarProfissional, ESTADO_INICIAL);
+
+  // Controlados só para revelar o campo de registro (CRN/CREF) da atuação
+  // escolhida — o valor enviado continua vindo do próprio checkbox.
+  const [ehNutricionista, setEhNutricionista] = useState(false);
+  const [ehPersonal, setEhPersonal] = useState(false);
 
   const estado = modo === "entrar" ? estadoEntrar : estadoCadastrar;
 
@@ -27,8 +32,8 @@ export default function LoginPersonal() {
           Você prescreve<span style={{ color: "var(--signature-sheipe)" }}>,</span> o app só acompanha.
         </blockquote>
         <p className="max-w-sm text-sm" style={{ color: "var(--signature-paper)", opacity: 0.6 }}>
-          O treino vem sempre de você. O aluno registra o que treinou entre sessões e você vê a frequência num só
-          painel.
+          Dieta, treino ou os dois. O cliente registra o dia a dia entre as consultas e você acompanha a aderência
+          num só painel.
         </p>
       </section>
 
@@ -38,7 +43,7 @@ export default function LoginPersonal() {
             <NoSheipeLogo size={24} />
           </div>
           <h1 className="font-display mt-1 text-3xl">{modo === "entrar" ? "Entrar" : "Criar conta"}</h1>
-          <p className="mt-2 text-sm text-ink-soft">Painel de personal trainer.</p>
+          <p className="mt-2 text-sm text-ink-soft">Painel do profissional.</p>
 
           <div className="mt-6 flex gap-1 rounded-sm border border-rule p-1 text-sm">
             <button
@@ -76,14 +81,48 @@ export default function LoginPersonal() {
                   className="w-full rounded-sm border border-rule bg-paper-raised px-3 py-2.5 text-sm outline-none transition-colors focus:border-sheipe"
                 />
               </label>
-              <label className="text-sm">
-                <span className="eyebrow mb-1.5 block">CREF (opcional)</span>
-                <input
-                  type="text"
-                  name="cref"
-                  className="w-full rounded-sm border border-rule bg-paper-raised px-3 py-2.5 text-sm outline-none transition-colors focus:border-sheipe"
-                />
-              </label>
+
+              <fieldset className="rounded-sm border border-rule p-3">
+                <legend className="eyebrow px-1">O que você faz?</legend>
+                <p className="mb-2 text-xs text-ink-faint">
+                  Pode marcar os dois — o painel se ajusta ao que você marcar.
+                </p>
+                <label className="flex items-center gap-2.5 py-1 text-sm">
+                  <input
+                    type="checkbox"
+                    name="ehNutricionista"
+                    checked={ehNutricionista}
+                    onChange={(evento) => setEhNutricionista(evento.target.checked)}
+                  />
+                  Nutricionista
+                </label>
+                {ehNutricionista && (
+                  <input
+                    type="text"
+                    name="crn"
+                    placeholder="CRN (opcional)"
+                    className="mt-1 mb-2 w-full rounded-sm border border-rule bg-paper-raised px-3 py-2 text-sm outline-none transition-colors focus:border-sheipe"
+                  />
+                )}
+                <label className="flex items-center gap-2.5 py-1 text-sm">
+                  <input
+                    type="checkbox"
+                    name="ehPersonal"
+                    checked={ehPersonal}
+                    onChange={(evento) => setEhPersonal(evento.target.checked)}
+                  />
+                  Personal trainer
+                </label>
+                {ehPersonal && (
+                  <input
+                    type="text"
+                    name="cref"
+                    placeholder="CREF (opcional)"
+                    className="mt-1 w-full rounded-sm border border-rule bg-paper-raised px-3 py-2 text-sm outline-none transition-colors focus:border-sheipe"
+                  />
+                )}
+              </fieldset>
+
               <CampoEmail />
               <CampoSenha autoComplete="new-password" />
               {estado.erro && <p className="text-sm text-urgent">{estado.erro}</p>}

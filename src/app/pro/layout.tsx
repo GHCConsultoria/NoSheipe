@@ -4,14 +4,14 @@ import { ThemeToggle } from "@/components/nutri/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "NoSheipe",
-  description: "Painel do personal trainer e registro de treinos por áudio/texto.",
+  description: "Painel do profissional — nutrição e treino num só lugar.",
   icons: {
     icon: "/icons/nosheipe-192.png",
     apple: "/icons/nosheipe-180.png",
   },
 };
 
-export default function PersonalRootLayout({ children }: { children: React.ReactNode }) {
+export default function ProRootLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <ScriptSemFlashDeTema />

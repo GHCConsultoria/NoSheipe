@@ -14,6 +14,20 @@ const nextConfig = {
     // caminhos reais do pacote.
     serverComponentsExternalPackages: ["@prisma/client", "@prisma/adapter-libsql", "@libsql/client"],
   },
+
+  // /nutri e /personal viraram a área única /pro quando Nutricionista e
+  // PersonalTrainer viraram um Profissional só. Feito aqui, e não como
+  // página que chama redirect(), porque uma página estática produz só um
+  // meta-refresh no HTML — aqui sai um 308 de verdade, com Location, antes
+  // de qualquer renderização.
+  async redirects() {
+    return [
+      { source: "/nutri", destination: "/pro", permanent: true },
+      { source: "/nutri/:caminho*", destination: "/pro/:caminho*", permanent: true },
+      { source: "/personal", destination: "/pro", permanent: true },
+      { source: "/personal/:caminho*", destination: "/pro/:caminho*", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

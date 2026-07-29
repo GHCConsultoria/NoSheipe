@@ -4,8 +4,8 @@
 // Prisma; ver src/lib/nutri/prisma.ts.
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "./generated"
+  provider        = "prisma-client-js"
+  output          = "./generated"
   // "native" cobre a máquina de desenvolvimento; "rhel-openssl-3.0.x" é o
   // runtime das funções serverless da Vercel. Sem ele o build passa, mas em
   // produção o client falha em runtime com "could not locate the Query
@@ -22,6 +22,50 @@ datasource db {
   url      = env("TURSO_DATABASE_URL")
 }
 
+/// Profissional unificado — substitui Nutricionista e PersonalTrainer, que
+/// eram cópias uma da outra. Um profissional pode ser nutricionista,
+/// personal, ou os dois: as capacidades é que decidem o que ele consegue
+/// prescrever e o que aparece no painel dele.
+///
+/// Nutricionista/PersonalTrainer continuam no schema por enquanto para não
+/// destruir as linhas antigas (nenhuma exclusão física — ver CLAUDE.md);
+/// nenhum código novo os lê. Serão removidos numa limpeza posterior.
+model Profissional {
+  id String @id @default(cuid())
+
+  // id do usuário no Supabase Auth (auth.users.id) — mesmo padrão dos
+  // models que este substitui.
+  authUserId String @unique
+  nome       String
+  email      String @unique
+
+  // Capacidades. Pelo menos uma precisa ser true (validado em
+  // src/lib/profissional/schemas.ts — SQLite não tem CHECK constraint útil
+  // via Prisma).
+  ehNutricionista Boolean @default(false)
+  ehPersonal      Boolean @default(false)
+
+  crn  String? // registro profissional, só faz sentido com ehNutricionista
+  cref String? // idem, com ehPersonal
+
+  // Limite do plano demo, mesma trava de quantidade de antes.
+  limitePlano Int @default(20)
+
+  // Acesso à interface administrativa (/master). Concedido só manualmente
+  // no banco — de propósito não existe tela que promova alguém a master.
+  ehMaster Boolean @default(false)
+
+  pacientes Paciente[]
+  alunos    Aluno[]
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@map("profissionais")
+}
+
+/// Obsoleto: substituído por Profissional. Mantido só para não apagar as
+/// linhas existentes; nenhum código novo lê deste model.
 model Nutricionista {
   id String @id @default(cuid())
 
@@ -47,6 +91,14 @@ model Nutricionista {
 model Paciente {
   id String @id @default(cuid())
 
+  // Dono atual. Nullable só porque SQLite não permite adicionar coluna NOT
+  // NULL a uma tabela que já tem linhas — todo código novo sempre preenche,
+  // e as consultas filtram por ele.
+  profissional   Profissional? @relation(fields: [profissionalId], references: [id])
+  profissionalId String?
+
+  // Obsoleto: dono antigo, antes da unificação em Profissional. Mantido
+  // para não perder o vínculo histórico; nenhum código novo lê.
   nutricionista   Nutricionista @relation(fields: [nutricionistaId], references: [id])
   nutricionistaId String
 
@@ -161,11 +213,10 @@ model RefeicaoFavorita {
 }
 
 // --- Módulo de personal trainer ---
-// Mesmo banco (Turso) e client Prisma do módulo de nutrição, mas entidades
-// completamente separadas de Nutricionista/Paciente — mesma pessoa física
-// pode ser aluno de um personal e paciente de um nutricionista ao mesmo
-// tempo, sem os dois produtos precisarem compartilhar registro.
 
+/// Obsoleto: substituído por Profissional (que cobre nutricionista e
+/// personal na mesma tabela). Mantido só para não apagar as linhas
+/// existentes; nenhum código novo lê deste model.
 model PersonalTrainer {
   id String @id @default(cuid())
 
@@ -187,6 +238,11 @@ model PersonalTrainer {
 model Aluno {
   id String @id @default(cuid())
 
+  // Dono atual — ver nota sobre nullable em Paciente.profissionalId.
+  profissional   Profissional? @relation(fields: [profissionalId], references: [id])
+  profissionalId String?
+
+  // Obsoleto: dono antigo, antes da unificação em Profissional.
   personalTrainer   PersonalTrainer @relation(fields: [personalTrainerId], references: [id])
   personalTrainerId String
 

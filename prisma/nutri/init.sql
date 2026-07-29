@@ -1,4 +1,20 @@
 -- CreateTable
+CREATE TABLE IF NOT EXISTS "profissionais" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "authUserId" TEXT NOT NULL,
+    "nome" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "ehNutricionista" BOOLEAN NOT NULL DEFAULT false,
+    "ehPersonal" BOOLEAN NOT NULL DEFAULT false,
+    "crn" TEXT,
+    "cref" TEXT,
+    "limitePlano" INTEGER NOT NULL DEFAULT 20,
+    "ehMaster" BOOLEAN NOT NULL DEFAULT false,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" DATETIME NOT NULL
+);
+
+-- CreateTable
 CREATE TABLE IF NOT EXISTS "nutricionistas" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "authUserId" TEXT NOT NULL,
@@ -124,6 +140,21 @@ CREATE TABLE IF NOT EXISTS "registros_treino" (
     "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "registros_treino_alunoId_fkey" FOREIGN KEY ("alunoId") REFERENCES "alunos" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
+
+-- AlterTable
+-- Dono unificado de paciente/aluno. O SQLite não tem "ADD COLUMN IF NOT
+-- EXISTS": a partir da segunda execução isto falha com "duplicate column
+-- name", que aplicar-schema.mjs trata como "já aplicado" e ignora.
+ALTER TABLE "pacientes" ADD COLUMN "profissionalId" TEXT REFERENCES "profissionais" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AlterTable
+ALTER TABLE "alunos" ADD COLUMN "profissionalId" TEXT REFERENCES "profissionais" ("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "profissionais_authUserId_key" ON "profissionais"("authUserId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "profissionais_email_key" ON "profissionais"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "nutricionistas_authUserId_key" ON "nutricionistas"("authUserId");
