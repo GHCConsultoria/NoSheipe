@@ -8,7 +8,6 @@ import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/compo
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
 import { registrarPeso, registrarTreino, removerFavorito, salvarFavorito } from "@/lib/cliente/publico";
-import { MeusProfissionais, SolicitacoesPendentes } from "@/components/cliente/MeusProfissionais";
 
 interface SaldoMacro {
   consumido: number;
@@ -16,18 +15,11 @@ interface SaldoMacro {
   percentual: number;
 }
 
-interface Vinculo {
-  id: string;
-  tipo: "NUTRICAO" | "TREINO";
-  profissionalNome: string;
-}
-
 interface Props {
   token: string;
   nome: string;
-  codigoConvite: string;
-  vinculosAtivos: Vinculo[];
-  solicitacoes: Vinculo[];
+  /** Quantos pedidos esperam resposta — só pra apontar o caminho ao Perfil. */
+  solicitacoesPendentes: number;
   nutricao: {
     saldo: { kcal: SaldoMacro; proteina: SaldoMacro; carbo: SaldoMacro; gordura: SaldoMacro };
     registrosHoje: {
@@ -58,15 +50,7 @@ interface Props {
  * Cada bloco só aparece se existir o profissional correspondente — quem só
  * tem nutricionista nunca vê nada de treino.
  */
-export function HomeDoCliente({
-  token,
-  nome,
-  codigoConvite,
-  vinculosAtivos,
-  solicitacoes,
-  nutricao,
-  treino,
-}: Props) {
+export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, treino }: Props) {
   const semAcompanhamento = !nutricao && !treino;
 
   return (
@@ -76,16 +60,20 @@ export function HomeDoCliente({
       </div>
       <h1 className="font-display text-2xl">Olá, {nome}</h1>
 
-      {/* Antes do progresso: quem está esperando resposta dele. Aparece
-          inclusive pra quem ainda não tem nenhum profissional — é
-          justamente quem mais recebe solicitação. */}
-      <SolicitacoesPendentes token={token} solicitacoes={solicitacoes} />
-
       {semAcompanhamento ? (
-        <p className="mt-6 text-sm text-ink-soft">
-          Você ainda não tem nenhum profissional acompanhando. Passe o código abaixo pro seu nutricionista ou personal
-          — assim que você aceitar o pedido dele, seu progresso aparece aqui.
-        </p>
+        <div className="mt-6 flex flex-col items-start gap-3">
+          <p className="text-sm text-ink-soft">
+            {solicitacoesPendentes > 0
+              ? "Tem profissional esperando sua resposta pra começar a te acompanhar."
+              : "Você ainda não tem nenhum profissional acompanhando. Assim que tiver, seu progresso do dia aparece aqui."}
+          </p>
+          <Link
+            href={`/p/${token}/perfil`}
+            className="rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep"
+          >
+            {solicitacoesPendentes > 0 ? "Ver quem pediu" : "Pegar meu código"}
+          </Link>
+        </div>
       ) : (
         <>
           <section className="mt-6 flex flex-col gap-3">
@@ -103,17 +91,8 @@ export function HomeDoCliente({
           {treino && <BlocoTreino token={token} treino={treino.treino} sessoes={treino.sessoesHoje} />}
           {nutricao && <BlocoPeso token={token} ultimoPesoKg={nutricao.ultimoPesoKg} />}
 
-          {nutricao && (
-            <div className="mt-6">
-              <Link href={`/p/${token}/historico`} className="text-sm text-ink-soft hover:text-sheipe">
-                ver histórico →
-              </Link>
-            </div>
-          )}
         </>
       )}
-
-      <MeusProfissionais token={token} codigoConvite={codigoConvite} ativos={vinculosAtivos} />
     </main>
   );
 }

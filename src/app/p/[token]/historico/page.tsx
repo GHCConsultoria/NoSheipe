@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { buscarClientePorToken, buscarHistoricoDeDias } from "@/lib/cliente/consultas";
 import { estaForaDaMeta } from "@/lib/nutri/aderencia";
@@ -24,14 +22,8 @@ export default async function HistoricoCliente({ params }: { params: { token: st
 
   return (
     <main className="mx-auto max-w-md px-6 py-10">
-      <Link
-        href={`/p/${params.token}`}
-        className="inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-sheipe"
-      >
-        <ArrowLeft size={15} strokeWidth={1.75} /> voltar
-      </Link>
-
-      <div className="mt-6 mb-2">
+      {/* Sem link de "voltar": a barra do rodapé já leva pra qualquer aba. */}
+      <div className="mb-2">
         <NoSheipeLogo size={22} />
       </div>
       <h1 className="font-display text-2xl">Seu histórico</h1>

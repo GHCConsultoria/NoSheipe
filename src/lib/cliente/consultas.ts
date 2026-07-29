@@ -199,6 +199,22 @@ export async function buscarHistoricoDeDias(clienteId: string, dias = 14) {
   }));
 }
 
+/**
+ * O que a barra de rodapé precisa saber, sem carregar o painel inteiro:
+ * quantos pedidos esperam resposta (o distintivo) e se existe nutrição
+ * ativa (sem ela não há histórico de dieta pra mostrar).
+ */
+export async function buscarResumoDaNavegacao(clienteId: string) {
+  const [pendentes, nutricaoAtiva] = await Promise.all([
+    prismaNutri.vinculo.count({ where: { clienteId, status: StatusVinculo.PENDENTE } }),
+    prismaNutri.vinculo.findFirst({
+      where: { clienteId, status: StatusVinculo.ATIVO, tipo: TipoVinculo.NUTRICAO },
+      select: { id: true },
+    }),
+  ]);
+  return { pendentes, temNutricao: nutricaoAtiva !== null };
+}
+
 export async function buscarPesoDoCliente(clienteId: string, dias = 90) {
   const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
   return prismaNutri.medida.findMany({
