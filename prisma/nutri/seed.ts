@@ -33,6 +33,44 @@ async function seedProfissionalDemo() {
 }
 
 /**
+ * Concede acesso à interface administrativa. MASTER_EMAILS aceita uma
+ * lista separada por vírgula.
+ *
+ * Continua sendo concessão manual, como combinado: é configuração de
+ * ambiente aplicada no deploy, não uma tela dentro do app — não existe
+ * caminho pelo qual um profissional se promova sozinho.
+ *
+ * Só concede, nunca revoga: tirar o acesso de alguém é decisão deliberada
+ * e se faz no banco, pra ninguém perder acesso por um deploy que esqueceu
+ * a variável. Os masters atuais vão pro log em todo deploy, pra a lista
+ * nunca ficar invisível.
+ */
+async function seedMasters() {
+  const emails = (process.env.MASTER_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+
+  for (const email of emails) {
+    const profissional = await prismaNutri.profissional.findUnique({ where: { email } });
+    if (!profissional) {
+      console.warn(`MASTER_EMAILS: "${email}" nao corresponde a nenhum profissional — ignorado.`);
+      continue;
+    }
+    if (profissional.ehMaster) continue;
+    await prismaNutri.profissional.update({ where: { id: profissional.id }, data: { ehMaster: true } });
+    console.log(`Acesso de administracao concedido a "${profissional.nome}".`);
+  }
+
+  const masters = await prismaNutri.profissional.findMany({ where: { ehMaster: true }, select: { email: true } });
+  console.log(
+    masters.length > 0
+      ? `Masters atuais: ${masters.map((m) => m.email).join(", ")}.`
+      : "Nenhum master — /master devolve 404 pra todo mundo.",
+  );
+}
+
+/**
  * Segundo profissional, só personal — existe pra o fluxo da Fase 3 ser
  * testável sem criar duas contas: é ele que aparece pedindo pra acompanhar
  * o treino de um cliente que já tem nutricionista.
@@ -393,6 +431,8 @@ async function semear() {
 
   console.log(`${CLIENTES_FAKE.length} clientes fake semeados no Turso, atribuídos a "${dono.nome}".`);
   console.log(`Pedido de vínculo pendente de "${bruno.nome}" em /p/demo-rafael-lima.`);
+
+  await seedMasters();
 }
 
 semear()

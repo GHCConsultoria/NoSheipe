@@ -5,6 +5,12 @@ import { NextResponse, type NextRequest } from "next/server";
 // seu login); com o Profissional unificado é só uma.
 const AREA_PROFISSIONAL = { prefixo: "/pro", login: "/pro/login" };
 
+// /master usa o mesmo login: é um profissional com ehMaster no banco, não
+// uma conta à parte. Aqui só se confere que existe sessão; quem confere a
+// permissão em si é src/app/master/layout.tsx — o middleware roda no edge
+// e não tem acesso ao banco.
+const PREFIXOS_COM_SESSAO = [AREA_PROFISSIONAL.prefixo, "/master"];
+
 /**
  * Renova a sessão do Supabase a cada navegação e redireciona para o login
  * quando não há usuário autenticado. Os links públicos (/p/[token] do
@@ -18,7 +24,7 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  if (!request.nextUrl.pathname.startsWith(AREA_PROFISSIONAL.prefixo)) {
+  if (!PREFIXOS_COM_SESSAO.some((prefixo) => request.nextUrl.pathname.startsWith(prefixo))) {
     return response;
   }
   const area = AREA_PROFISSIONAL;

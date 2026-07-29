@@ -34,14 +34,26 @@ export default async function Painel() {
           </div>
           <h1 className="font-display text-3xl">Olá, {profissional.nome}</h1>
         </div>
-        <form action={sairProfissional}>
-          <button
-            type="submit"
-            className="rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink"
-          >
-            Sair
-          </button>
-        </form>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Só quem tem ehMaster no banco vê o link — a rota já devolve
+              404 pros outros, mas não faz sentido mostrar. */}
+          {profissional.ehMaster && (
+            <Link
+              href="/master"
+              className="rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink"
+            >
+              Admin
+            </Link>
+          )}
+          <form action={sairProfissional}>
+            <button
+              type="submit"
+              className="rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink"
+            >
+              Sair
+            </button>
+          </form>
+        </div>
       </div>
 
       <p className="mt-2 text-sm text-ink-soft">
