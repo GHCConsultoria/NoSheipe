@@ -54,6 +54,8 @@ export function useReconhecimentoDeFala() {
   const [gravando, setGravando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const reconhecimentoRef = useRef<SpeechRecognitionInstance | null>(null);
+  const transcricaoRef = useRef("");
+  const callbackRef = useRef<((texto: string) => void) | null>(null);
 
   const iniciar = useCallback((aoTranscrever: (texto: string) => void) => {
     const Construtor = obterConstrutor();
@@ -63,23 +65,38 @@ export function useReconhecimentoDeFala() {
     }
 
     setErro(null);
+    transcricaoRef.current = "";
+    callbackRef.current = aoTranscrever;
+
     const reconhecimento = new Construtor();
     reconhecimento.lang = "pt-BR";
     reconhecimento.continuous = false;
-    reconhecimento.interimResults = false;
+    // interimResults=false parece mais "certo" (só resultado final), mas no
+    // Safari/iOS costuma nunca disparar onresult nenhum nesse modo — grava e
+    // termina sem transcrever nada. Com interimResults=true, guarda sempre o
+    // texto mais recente aqui e entrega ele em onend (que sempre dispara),
+    // em vez de depender de um resultado "final" que o Safari às vezes não
+    // entrega.
+    reconhecimento.interimResults = true;
 
     reconhecimento.onresult = (evento) => {
       const transcricao = Array.from({ length: evento.results.length }, (_, i) => evento.results[i][0].transcript).join(
         " ",
       );
-      aoTranscrever(transcricao.trim());
+      transcricaoRef.current = transcricao.trim();
     };
     reconhecimento.onerror = () => {
-      setErro("não deu pra entender o áudio — tente de novo ou use o texto");
-      setGravando(false);
+      // Safari costuma disparar "no-speech"/"aborted" mesmo quando já
+      // capturou algo útil — só mostra erro se não sobrou transcrição.
+      if (!transcricaoRef.current) {
+        setErro("não deu pra entender o áudio — tente de novo ou use o texto");
+      }
     };
     reconhecimento.onend = () => {
       setGravando(false);
+      if (transcricaoRef.current) {
+        callbackRef.current?.(transcricaoRef.current);
+      }
     };
 
     reconhecimentoRef.current = reconhecimento;
