@@ -4,8 +4,13 @@
 // Prisma; ver src/lib/nutri/prisma.ts.
 
 generator client {
-  provider        = "prisma-client-js"
-  output          = "./generated"
+  provider = "prisma-client-js"
+  output   = "./generated"
+  // "native" cobre a máquina de desenvolvimento; "rhel-openssl-3.0.x" é o
+  // runtime das funções serverless da Vercel. Sem ele o build passa, mas em
+  // produção o client falha em runtime com "could not locate the Query
+  // Engine" — o driver adapter troca o driver do banco, não o engine.
+  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
   previewFeatures = ["driverAdapters"]
 }
 
