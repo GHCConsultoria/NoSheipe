@@ -3,7 +3,8 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prismaNutri } from "@/lib/nutri/prisma";
-import { obterPersonalTrainerAtual } from "@/lib/personal/auth";
+import { Capacidade, exigirCapacidade } from "@/lib/profissional/auth";
+import { obterDonoLegadoTreino } from "@/lib/profissional/donos-legados";
 import { StatusAluno, criarAlunoSchema, treinoSchema, alunoIdSchema } from "@/lib/personal/schemas";
 
 export type ResultadoAcaoPersonal = { sucesso: true } | { sucesso: false; erro: string };
@@ -14,13 +15,13 @@ function gerarTokenAcesso(): string {
 }
 
 /**
- * Confere que o aluno pertence ao personal trainer logado antes de deixar
- * mexer nele — mesmo cuidado de buscarPacienteDoNutricionista em
+ * Confere que o aluno pertence ao profissional logado antes de deixar mexer
+ * nele — mesmo cuidado de buscarPacienteDoProfissional em
  * src/lib/nutri/acoes.ts.
  */
-async function buscarAlunoDoPersonalTrainer(alunoId: string, personalTrainerId: string) {
+async function buscarAlunoDoProfissional(alunoId: string, profissionalId: string) {
   const aluno = await prismaNutri.aluno.findUnique({ where: { id: alunoId } });
-  if (!aluno || aluno.personalTrainerId !== personalTrainerId) {
+  if (!aluno || aluno.profissionalId !== profissionalId) {
     return null;
   }
   return aluno;
@@ -33,28 +34,29 @@ export async function criarAluno(input: unknown): Promise<ResultadoAcaoPersonal>
     return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
   }
 
-  const personalTrainer = await obterPersonalTrainerAtual();
+  const profissional = await exigirCapacidade(Capacidade.TREINO);
 
   const totalAtivos = await prismaNutri.aluno.count({
-    where: { personalTrainerId: personalTrainer.id, status: StatusAluno.ATIVO },
+    where: { profissionalId: profissional.id, status: StatusAluno.ATIVO },
   });
-  if (totalAtivos >= personalTrainer.limitePlano) {
+  if (totalAtivos >= profissional.limitePlano) {
     return {
       sucesso: false,
-      erro: `limite de ${personalTrainer.limitePlano} alunos do plano atingido — arquive alguém antes de cadastrar outro`,
+      erro: `limite de ${profissional.limitePlano} alunos do plano atingido — arquive alguém antes de cadastrar outro`,
     };
   }
 
   await prismaNutri.aluno.create({
     data: {
-      personalTrainerId: personalTrainer.id,
+      profissionalId: profissional.id,
+      personalTrainerId: await obterDonoLegadoTreino(),
       nome: parsed.data.nome,
       telefone: parsed.data.telefone || null,
       tokenAcesso: gerarTokenAcesso(),
     },
   });
 
-  revalidatePath("/personal");
+  revalidatePath("/app");
   return { sucesso: true };
 }
 
@@ -69,8 +71,8 @@ export async function atualizarTreino(input: unknown): Promise<ResultadoAcaoPers
     return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
   }
 
-  const personalTrainer = await obterPersonalTrainerAtual();
-  const aluno = await buscarAlunoDoPersonalTrainer(parsed.data.alunoId, personalTrainer.id);
+  const profissional = await exigirCapacidade(Capacidade.TREINO);
+  const aluno = await buscarAlunoDoProfissional(parsed.data.alunoId, profissional.id);
   if (!aluno) {
     return { sucesso: false, erro: "aluno não encontrado" };
   }
@@ -87,8 +89,8 @@ export async function atualizarTreino(input: unknown): Promise<ResultadoAcaoPers
     }),
   ]);
 
-  revalidatePath(`/personal/alunos/${aluno.id}`);
-  revalidatePath("/personal");
+  revalidatePath(`/app/alunos/${aluno.id}`);
+  revalidatePath("/app");
   return { sucesso: true };
 }
 
@@ -99,8 +101,8 @@ export async function regenerarTokenAluno(input: unknown): Promise<ResultadoToke
     return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
   }
 
-  const personalTrainer = await obterPersonalTrainerAtual();
-  const aluno = await buscarAlunoDoPersonalTrainer(parsed.data.alunoId, personalTrainer.id);
+  const profissional = await exigirCapacidade(Capacidade.TREINO);
+  const aluno = await buscarAlunoDoProfissional(parsed.data.alunoId, profissional.id);
   if (!aluno) {
     return { sucesso: false, erro: "aluno não encontrado" };
   }
@@ -108,7 +110,7 @@ export async function regenerarTokenAluno(input: unknown): Promise<ResultadoToke
   const token = gerarTokenAcesso();
   await prismaNutri.aluno.update({ where: { id: aluno.id }, data: { tokenAcesso: token } });
 
-  revalidatePath(`/personal/alunos/${aluno.id}`);
+  revalidatePath(`/app/alunos/${aluno.id}`);
   return { sucesso: true, token };
 }
 
@@ -119,14 +121,14 @@ export async function arquivarAluno(input: unknown): Promise<ResultadoAcaoPerson
     return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
   }
 
-  const personalTrainer = await obterPersonalTrainerAtual();
-  const aluno = await buscarAlunoDoPersonalTrainer(parsed.data.alunoId, personalTrainer.id);
+  const profissional = await exigirCapacidade(Capacidade.TREINO);
+  const aluno = await buscarAlunoDoProfissional(parsed.data.alunoId, profissional.id);
   if (!aluno) {
     return { sucesso: false, erro: "aluno não encontrado" };
   }
 
   await prismaNutri.aluno.update({ where: { id: aluno.id }, data: { status: StatusAluno.ARQUIVADO } });
 
-  revalidatePath("/personal");
+  revalidatePath("/app");
   return { sucesso: true };
 }

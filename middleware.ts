@@ -1,18 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Cada área profissional tem seu próprio login; o gate redireciona pra
-// tela certa em vez de sempre mandar pro /nutri/login.
-const AREAS_PROTEGIDAS = [
-  { prefixo: "/nutri", login: "/nutri/login" },
-  { prefixo: "/personal", login: "/personal/login" },
-];
+// Área do profissional. Antes eram duas (/nutri e /personal, cada uma com
+// seu login); com o Profissional unificado é só uma.
+const AREA_PROFISSIONAL = { prefixo: "/pro", login: "/pro/login" };
 
 /**
  * Renova a sessão do Supabase a cada navegação e redireciona para o login
- * da área correspondente quando não há usuário autenticado. Os links
- * públicos (/p/[token] do paciente e /t/[token] do aluno) ficam de fora do
- * gate inteiramente — o token na própria URL é a credencial.
+ * quando não há usuário autenticado. Os links públicos (/p/[token] do
+ * paciente e /t/[token] do aluno) ficam de fora do gate inteiramente — o
+ * token na própria URL é a credencial.
  */
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -21,10 +18,10 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const area = AREAS_PROTEGIDAS.find(({ prefixo }) => request.nextUrl.pathname.startsWith(prefixo));
-  if (!area) {
+  if (!request.nextUrl.pathname.startsWith(AREA_PROFISSIONAL.prefixo)) {
     return response;
   }
+  const area = AREA_PROFISSIONAL;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

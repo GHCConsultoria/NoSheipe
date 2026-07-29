@@ -3,7 +3,8 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prismaNutri } from "@/lib/nutri/prisma";
-import { obterNutricionistaAtual } from "@/lib/nutri/auth";
+import { Capacidade, exigirCapacidade } from "@/lib/profissional/auth";
+import { obterDonoLegadoNutricao } from "@/lib/profissional/donos-legados";
 import {
   StatusPaciente,
   criarPacienteSchema,
@@ -20,13 +21,13 @@ function gerarTokenAcesso(): string {
 }
 
 /**
- * Confere que o paciente pertence ao nutricionista logado antes de deixar
- * mexer nele — sem isso, um nutricionista logado conseguiria editar/
- * arquivar paciente de outro só sabendo o id.
+ * Confere que o paciente pertence ao profissional logado antes de deixar
+ * mexer nele — sem isso, um profissional logado conseguiria editar/arquivar
+ * paciente de outro só sabendo o id.
  */
-async function buscarPacienteDoNutricionista(pacienteId: string, nutricionistaId: string) {
+async function buscarPacienteDoProfissional(pacienteId: string, profissionalId: string) {
   const paciente = await prismaNutri.paciente.findUnique({ where: { id: pacienteId } });
-  if (!paciente || paciente.nutricionistaId !== nutricionistaId) {
+  if (!paciente || paciente.profissionalId !== profissionalId) {
     return null;
   }
   return paciente;
@@ -43,21 +44,22 @@ export async function criarPaciente(input: unknown): Promise<ResultadoAcaoNutri>
     return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
   }
 
-  const nutricionista = await obterNutricionistaAtual();
+  const profissional = await exigirCapacidade(Capacidade.NUTRICAO);
 
   const totalAtivos = await prismaNutri.paciente.count({
-    where: { nutricionistaId: nutricionista.id, status: StatusPaciente.ATIVO },
+    where: { profissionalId: profissional.id, status: StatusPaciente.ATIVO },
   });
-  if (totalAtivos >= nutricionista.limitePlano) {
+  if (totalAtivos >= profissional.limitePlano) {
     return {
       sucesso: false,
-      erro: `limite de ${nutricionista.limitePlano} pacientes do plano atingido — arquive alguém antes de cadastrar outro`,
+      erro: `limite de ${profissional.limitePlano} pacientes do plano atingido — arquive alguém antes de cadastrar outro`,
     };
   }
 
   await prismaNutri.paciente.create({
     data: {
-      nutricionistaId: nutricionista.id,
+      profissionalId: profissional.id,
+      nutricionistaId: await obterDonoLegadoNutricao(),
       nome: parsed.data.nome,
       telefone: parsed.data.telefone || null,
       tokenAcesso: gerarTokenAcesso(),
@@ -68,7 +70,7 @@ export async function criarPaciente(input: unknown): Promise<ResultadoAcaoNutri>
     },
   });
 
-  revalidatePath("/nutri");
+  revalidatePath("/app");
   return { sucesso: true };
 }
 
@@ -78,8 +80,8 @@ export async function atualizarMetas(input: unknown): Promise<ResultadoAcaoNutri
     return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
   }
 
-  const nutricionista = await obterNutricionistaAtual();
-  const paciente = await buscarPacienteDoNutricionista(parsed.data.pacienteId, nutricionista.id);
+  const profissional = await exigirCapacidade(Capacidade.NUTRICAO);
+  const paciente = await buscarPacienteDoProfissional(parsed.data.pacienteId, profissional.id);
   if (!paciente) {
     return { sucesso: false, erro: "paciente não encontrado" };
   }
@@ -94,8 +96,8 @@ export async function atualizarMetas(input: unknown): Promise<ResultadoAcaoNutri
     },
   });
 
-  revalidatePath(`/nutri/pacientes/${paciente.id}`);
-  revalidatePath("/nutri");
+  revalidatePath(`/app/pacientes/${paciente.id}`);
+  revalidatePath("/app");
   return { sucesso: true };
 }
 
@@ -106,8 +108,8 @@ export async function regenerarTokenPaciente(input: unknown): Promise<ResultadoT
     return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
   }
 
-  const nutricionista = await obterNutricionistaAtual();
-  const paciente = await buscarPacienteDoNutricionista(parsed.data.pacienteId, nutricionista.id);
+  const profissional = await exigirCapacidade(Capacidade.NUTRICAO);
+  const paciente = await buscarPacienteDoProfissional(parsed.data.pacienteId, profissional.id);
   if (!paciente) {
     return { sucesso: false, erro: "paciente não encontrado" };
   }
@@ -115,7 +117,7 @@ export async function regenerarTokenPaciente(input: unknown): Promise<ResultadoT
   const token = gerarTokenAcesso();
   await prismaNutri.paciente.update({ where: { id: paciente.id }, data: { tokenAcesso: token } });
 
-  revalidatePath(`/nutri/pacientes/${paciente.id}`);
+  revalidatePath(`/app/pacientes/${paciente.id}`);
   return { sucesso: true, token };
 }
 
@@ -131,15 +133,15 @@ export async function arquivarPaciente(input: unknown): Promise<ResultadoAcaoNut
     return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
   }
 
-  const nutricionista = await obterNutricionistaAtual();
-  const paciente = await buscarPacienteDoNutricionista(parsed.data.pacienteId, nutricionista.id);
+  const profissional = await exigirCapacidade(Capacidade.NUTRICAO);
+  const paciente = await buscarPacienteDoProfissional(parsed.data.pacienteId, profissional.id);
   if (!paciente) {
     return { sucesso: false, erro: "paciente não encontrado" };
   }
 
   await prismaNutri.paciente.update({ where: { id: paciente.id }, data: { status: StatusPaciente.ARQUIVADO } });
 
-  revalidatePath("/nutri");
+  revalidatePath("/app");
   return { sucesso: true };
 }
 
@@ -154,14 +156,14 @@ export async function adicionarAnotacao(input: unknown): Promise<ResultadoAcaoNu
     return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
   }
 
-  const nutricionista = await obterNutricionistaAtual();
-  const paciente = await buscarPacienteDoNutricionista(parsed.data.pacienteId, nutricionista.id);
+  const profissional = await exigirCapacidade(Capacidade.NUTRICAO);
+  const paciente = await buscarPacienteDoProfissional(parsed.data.pacienteId, profissional.id);
   if (!paciente) {
     return { sucesso: false, erro: "paciente não encontrado" };
   }
 
   await prismaNutri.anotacaoPaciente.create({ data: { pacienteId: paciente.id, texto: parsed.data.texto } });
 
-  revalidatePath(`/nutri/pacientes/${paciente.id}`);
+  revalidatePath(`/app/pacientes/${paciente.id}`);
   return { sucesso: true };
 }

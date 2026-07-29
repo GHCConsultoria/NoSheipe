@@ -1,29 +1,24 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { z } from "zod";
 import { prismaNutri } from "@/lib/nutri/prisma";
 import { criarClienteSupabaseServidor } from "@/lib/supabase/server";
 import { criarClienteSupabaseAdmin } from "@/lib/supabase/admin";
+import { cadastroProfissionalSchema, entrarSchema } from "@/lib/profissional/schemas";
 
-export interface EstadoLoginPersonal {
+export interface EstadoLoginProfissional {
   erro?: string;
 }
-
-const entrarSchema = z.object({
-  email: z.string().email("informe um e-mail válido"),
-  senha: z.string().min(6, "a senha deve ter pelo menos 6 caracteres"),
-});
 
 function supabaseConfigurado(): boolean {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
-/** Login por e-mail/senha do personal trainer via Supabase Auth. */
-export async function entrarPersonalTrainer(
-  _estadoAnterior: EstadoLoginPersonal,
+/** Login por e-mail/senha do profissional via Supabase Auth. */
+export async function entrarProfissional(
+  _estadoAnterior: EstadoLoginProfissional,
   formData: FormData,
-): Promise<EstadoLoginPersonal> {
+): Promise<EstadoLoginProfissional> {
   const parsed = entrarSchema.safeParse({
     email: formData.get("email"),
     senha: formData.get("senha"),
@@ -45,25 +40,28 @@ export async function entrarPersonalTrainer(
     return { erro: "e-mail ou senha incorretos" };
   }
 
-  redirect("/personal");
+  redirect("/pro");
 }
 
-const cadastrarSchema = z.object({
-  nome: z.string().trim().min(1, "informe o nome"),
-  email: z.string().trim().email("e-mail inválido"),
-  senha: z.string().min(6, "a senha deve ter pelo menos 6 caracteres"),
-  cref: z.string().trim().optional(),
-});
-
-/** Cadastro self-service do personal trainer — mesmo padrão de cadastrarNutricionista. */
-export async function cadastrarPersonalTrainer(
-  _estadoAnterior: EstadoLoginPersonal,
+/**
+ * Cadastro self-service do profissional. Diferente das duas telas que este
+ * substitui, aqui o cadastro pergunta **o que a pessoa faz** — as
+ * capacidades é que decidem o que ela consegue prescrever e o que aparece
+ * no painel. Pelo menos uma é obrigatória (validado no schema Zod).
+ */
+export async function cadastrarProfissional(
+  _estadoAnterior: EstadoLoginProfissional,
   formData: FormData,
-): Promise<EstadoLoginPersonal> {
-  const parsed = cadastrarSchema.safeParse({
+): Promise<EstadoLoginProfissional> {
+  const parsed = cadastroProfissionalSchema.safeParse({
     nome: formData.get("nome"),
     email: formData.get("email"),
     senha: formData.get("senha"),
+    // Checkbox não marcado nem aparece no FormData — daí a comparação com
+    // "on" em vez de confiar na presença da chave.
+    ehNutricionista: formData.get("ehNutricionista") === "on",
+    ehPersonal: formData.get("ehPersonal") === "on",
+    crn: formData.get("crn") || undefined,
     cref: formData.get("cref") || undefined,
   });
   if (!parsed.success) {
@@ -91,17 +89,23 @@ export async function cadastrarPersonalTrainer(
   }
 
   try {
-    await prismaNutri.personalTrainer.create({
+    await prismaNutri.profissional.create({
       data: {
         authUserId: data.user.id,
         nome: parsed.data.nome,
         email: parsed.data.email,
-        cref: parsed.data.cref || null,
+        ehNutricionista: parsed.data.ehNutricionista,
+        ehPersonal: parsed.data.ehPersonal,
+        // Guarda o registro só do lado que a pessoa marcou — CRN de quem
+        // não é nutricionista seria dado sem sentido.
+        crn: parsed.data.ehNutricionista ? parsed.data.crn || null : null,
+        cref: parsed.data.ehPersonal ? parsed.data.cref || null : null,
       },
     });
   } catch {
-    // Sem isso, uma falha aqui deixaria um usuário Auth órfão, sem
-    // PersonalTrainer correspondente — mesmo cuidado de cadastrarNutricionista.
+    // Sem isto, uma falha aqui deixaria um usuário Auth órfão, sem
+    // Profissional correspondente — nunca conseguiria logar e ninguém
+    // saberia por quê.
     await supabaseAdmin.auth.admin.deleteUser(data.user.id).catch(() => {});
     return { erro: "e-mail já cadastrado ou dados inválidos" };
   }
@@ -115,11 +119,11 @@ export async function cadastrarPersonalTrainer(
     return { erro: "conta criada, mas falhou o login automático — tente entrar manualmente" };
   }
 
-  redirect("/personal");
+  redirect("/pro");
 }
 
-export async function sairPersonalTrainer(): Promise<void> {
+export async function sairProfissional(): Promise<void> {
   const supabase = await criarClienteSupabaseServidor();
   await supabase.auth.signOut();
-  redirect("/personal/login");
+  redirect("/pro/login");
 }

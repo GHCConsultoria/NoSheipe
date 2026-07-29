@@ -1,25 +1,10 @@
-import type { Paciente } from "../../../prisma/nutri/generated";
 import { prismaNutri } from "@/lib/nutri/prisma";
 import { StatusPaciente } from "@/lib/nutri/schemas";
-import {
-  calcularAderenciaSemana,
-  calcularSaldoDoDia,
-  estaForaDaMeta,
-  limitesDaSemanaEmSaoPaulo,
-  limitesDoDiaEmSaoPaulo,
-  type SaldoDoDia,
-} from "@/lib/nutri/aderencia";
+import { calcularSaldoDoDia, limitesDoDiaEmSaoPaulo, type SaldoDoDia } from "@/lib/nutri/aderencia";
 
-export async function buscarPacientesDoNutricionista(nutricionistaId: string) {
-  return prismaNutri.paciente.findMany({
-    where: { nutricionistaId, status: StatusPaciente.ATIVO },
-    orderBy: { criadoEm: "desc" },
-  });
-}
-
-export async function buscarPacientePorId(pacienteId: string, nutricionistaId: string) {
+export async function buscarPacientePorId(pacienteId: string, profissionalId: string) {
   const paciente = await prismaNutri.paciente.findUnique({ where: { id: pacienteId } });
-  if (!paciente || paciente.nutricionistaId !== nutricionistaId) {
+  if (!paciente || paciente.profissionalId !== profissionalId) {
     return null;
   }
   return paciente;
@@ -101,50 +86,4 @@ export async function buscarHistoricoDeDias(pacienteId: string, dias = 14): Prom
     saldo: calcularSaldoDoDia(registrosDoDia, paciente),
     totalRegistros: registrosDoDia.length,
   }));
-}
-
-export interface PacienteComAderencia {
-  paciente: Paciente;
-  saldoHoje: SaldoDoDia;
-  saldoSemana: SaldoDoDia;
-  foraDaMeta: boolean;
-  diasSemRegistro: number | null;
-}
-
-/** Painel de aderência do nutricionista: cada paciente ativo com % da meta batida hoje/semana. */
-export async function buscarPacientesComAderencia(nutricionistaId: string): Promise<PacienteComAderencia[]> {
-  const pacientes = await buscarPacientesDoNutricionista(nutricionistaId);
-  const { inicio: inicioHoje, fim: fimHoje } = limitesDoDiaEmSaoPaulo();
-  const { inicio: inicioSemana, diasDecorridos } = limitesDaSemanaEmSaoPaulo();
-
-  return Promise.all(
-    pacientes.map(async (paciente) => {
-      const [registrosHoje, registrosSemana, ultimoRegistro] = await Promise.all([
-        prismaNutri.registroRefeicao.findMany({
-          where: { pacienteId: paciente.id, registradoEm: { gte: inicioHoje, lt: fimHoje } },
-        }),
-        prismaNutri.registroRefeicao.findMany({
-          where: { pacienteId: paciente.id, registradoEm: { gte: inicioSemana, lt: fimHoje } },
-        }),
-        prismaNutri.registroRefeicao.findFirst({
-          where: { pacienteId: paciente.id },
-          orderBy: { registradoEm: "desc" },
-        }),
-      ]);
-
-      const saldoHoje = calcularSaldoDoDia(registrosHoje, paciente);
-      const saldoSemana = calcularAderenciaSemana(registrosSemana, paciente, diasDecorridos);
-      const diasSemRegistro = ultimoRegistro
-        ? Math.floor((Date.now() - ultimoRegistro.registradoEm.getTime()) / (24 * 60 * 60 * 1000))
-        : null;
-
-      return {
-        paciente,
-        saldoHoje,
-        saldoSemana,
-        foraDaMeta: estaForaDaMeta(saldoHoje.kcal.percentual),
-        diasSemRegistro,
-      };
-    }),
-  );
 }

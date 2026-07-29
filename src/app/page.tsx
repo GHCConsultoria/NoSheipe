@@ -11,21 +11,16 @@ export default function Home() {
         <div>
           <NoSheipeLogo size={28} />
           <h1 className="font-display mt-4 text-3xl">Acompanhamento entre consultas</h1>
-          <p className="mt-2 text-sm text-ink-soft">Você prescreve, o app só acompanha. Escolha sua área pra entrar.</p>
+          <p className="mt-2 text-sm text-ink-soft">Você prescreve, o app só acompanha.</p>
         </div>
 
+        {/* Uma entrada só: nutricionista e personal usam o mesmo login, e o
+            painel se ajusta ao que a pessoa marcou no cadastro. */}
         <div className="flex flex-col gap-3">
-          <Link href="/nutri/login" className="paper-card rounded-sm p-5 transition-colors hover:border-sheipe">
-            <p className="font-display text-lg">Sou nutricionista</p>
+          <Link href="/pro/login" className="paper-card rounded-sm p-5 transition-colors hover:border-sheipe">
+            <p className="font-display text-lg">Sou profissional</p>
             <p className="mt-1 text-sm text-ink-soft">
-              Defina metas de macro e veja a aderência dos pacientes num só painel.
-            </p>
-          </Link>
-
-          <Link href="/personal/login" className="paper-card rounded-sm p-5 transition-colors hover:border-sheipe">
-            <p className="font-display text-lg">Sou personal trainer</p>
-            <p className="mt-1 text-sm text-ink-soft">
-              Prescreva treinos e acompanhe a frequência dos alunos entre as sessões.
+              Nutricionista, personal trainer ou os dois: prescreva e acompanhe a aderência num só painel.
             </p>
           </Link>
         </div>
