@@ -68,6 +68,21 @@ export async function exigirCapacidade(capacidade: Capacidade): Promise<Profissi
   return profissional;
 }
 
+/**
+ * Exige acesso à interface administrativa (/master).
+ *
+ * `ehMaster` é concedido **só manualmente no banco**, de propósito: não
+ * existe tela que promova alguém a master, então não existe caminho de
+ * escalada de privilégio pela aplicação.
+ *
+ * Devolve null em vez de lançar porque quem chama responde com 404 — um
+ * profissional comum não deve nem descobrir que a rota existe.
+ */
+export async function obterMasterAtual(): Promise<Profissional | null> {
+  const profissional = await obterProfissionalAtual();
+  return profissional.ehMaster ? profissional : null;
+}
+
 /** True quando o erro deve levar o visitante de volta pro login. */
 export function ehErroDeAutenticacao(erro: unknown): boolean {
   return erro instanceof ProfissionalNaoAutenticadoError || erro instanceof ProfissionalNaoCadastradoError;

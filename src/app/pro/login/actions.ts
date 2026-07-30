@@ -5,6 +5,7 @@ import { prismaNutri } from "@/lib/nutri/prisma";
 import { criarClienteSupabaseServidor } from "@/lib/supabase/server";
 import { criarClienteSupabaseAdmin } from "@/lib/supabase/admin";
 import { cadastroProfissionalSchema, entrarSchema } from "@/lib/profissional/schemas";
+import { ehEmailJaRegistrado } from "@/lib/profissional/erros-auth";
 
 export interface EstadoLoginProfissional {
   erro?: string;
@@ -32,15 +33,58 @@ export async function entrarProfissional(
   }
 
   const supabase = await criarClienteSupabaseServidor();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.senha,
   });
-  if (error) {
+  if (error || !data.user) {
     return { erro: "e-mail ou senha incorretos" };
   }
 
+  // Autenticar não basta: sem a linha Profissional o painel não abre e o
+  // layout devolve pra cá. Sem esta checagem o login "dá certo", a pessoa
+  // volta pro login sem mensagem nenhuma e não tem como adivinhar o
+  // motivo — foi o que aconteceu de verdade antes disto existir.
+  const profissional = await prismaNutri.profissional.findUnique({ where: { authUserId: data.user.id } });
+  if (!profissional) {
+    // Sai da sessão pra não deixar meio-autenticado, quicando entre /pro e
+    // /pro/login a cada navegação.
+    await supabase.auth.signOut();
+    return {
+      erro:
+        "sua senha está certa, mas o cadastro nunca foi concluído. Use “criar conta” aqui embaixo, " +
+        "com este mesmo e-mail e senha, pra terminar — nada é duplicado.",
+    };
+  }
+
   redirect("/pro");
+}
+
+/**
+ * Adota um usuário que existe no Supabase Auth mas não tem `Profissional`
+ * no banco. Devolve o authUserId, ou null quando não é caso de adoção.
+ *
+ * Esse estado meio-caminho acontece de dois jeitos: contas criadas antes
+ * da Fase 1, quando o cadastro gravava um `Nutricionista` e a tabela
+ * `profissionais` nem existia; e cadastros que falharam entre criar o
+ * usuário no Auth e gravar a linha. Nos dois, a pessoa ficava sem saída
+ * pela tela — o cadastro recusava com "e-mail já registrado" e o login
+ * autenticava mas caía fora, porque o layout não acha o Profissional.
+ *
+ * A senha é conferida antes de adotar. Sem isso, qualquer um completaria
+ * o cadastro de um e-mail alheio e entraria na conta.
+ */
+async function adotarContaSemProfissional(email: string, senha: string): Promise<string | null> {
+  // Se já existe Profissional com esse e-mail, é duplicata de verdade:
+  // o caminho é entrar, não cadastrar de novo.
+  const jaExiste = await prismaNutri.profissional.findUnique({ where: { email } });
+  if (jaExiste) return null;
+
+  const supabase = await criarClienteSupabaseServidor();
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
+  if (error || !data.user) return null;
+
+  return data.user.id;
 }
 
 /**
@@ -84,14 +128,28 @@ export async function cadastrarProfissional(
     password: parsed.data.senha,
     email_confirm: true,
   });
-  if (error || !data.user) {
-    return { erro: error?.message ?? "falha ao criar usuário no Supabase Auth" };
+
+  // Só dá pra apagar o usuário no rollback se fomos nós que o criamos
+  // agora. Numa conta adotada, apagar seria destruir o login de alguém.
+  const criadoAgora = Boolean(data?.user);
+  const authUserId = data?.user?.id ?? (await adotarContaSemProfissional(parsed.data.email, parsed.data.senha));
+
+  if (!authUserId) {
+    // Chegar aqui com "e-mail já registrado" significa que a adoção não
+    // rolou: ou já existe Profissional (então é entrar, não cadastrar), ou
+    // a senha digitada não é a da conta. Qualquer outro erro do Auth —
+    // senha fraca, e-mail inválido — vai literal, que é mais útil.
+    return {
+      erro: ehEmailJaRegistrado(error?.message)
+        ? "esse e-mail já tem conta. Entre com a sua senha — se não lembrar, use a recuperação de senha."
+        : (error?.message ?? "falha ao criar usuário no Supabase Auth"),
+    };
   }
 
   try {
     await prismaNutri.profissional.create({
       data: {
-        authUserId: data.user.id,
+        authUserId,
         nome: parsed.data.nome,
         email: parsed.data.email,
         ehNutricionista: parsed.data.ehNutricionista,
@@ -104,10 +162,12 @@ export async function cadastrarProfissional(
     });
   } catch {
     // Sem isto, uma falha aqui deixaria um usuário Auth órfão, sem
-    // Profissional correspondente — nunca conseguiria logar e ninguém
-    // saberia por quê.
-    await supabaseAdmin.auth.admin.deleteUser(data.user.id).catch(() => {});
-    return { erro: "e-mail já cadastrado ou dados inválidos" };
+    // Profissional correspondente — exatamente o estado que
+    // adotarContaSemProfissional existe pra resgatar. Melhor não criar.
+    if (criadoAgora) {
+      await supabaseAdmin.auth.admin.deleteUser(authUserId).catch(() => {});
+    }
+    return { erro: "não deu pra concluir o cadastro — confira os dados e tente de novo" };
   }
 
   const supabase = await criarClienteSupabaseServidor();

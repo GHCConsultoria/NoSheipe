@@ -180,3 +180,184 @@ CREATE UNIQUE INDEX IF NOT EXISTS "alunos_tokenAcesso_key" ON "alunos"("tokenAce
 -- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "registros_treino_clienteRegistroId_key" ON "registros_treino"("clienteRegistroId");
 
+
+-- ============================================================
+-- Era do Cliente unificado (Fase 2).
+-- As tabelas acima (pacientes, alunos e seus registros) ficam
+-- intactas mas deixam de ser lidas — nenhuma exclusão física.
+-- ============================================================
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "clientes" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "nome" TEXT NOT NULL,
+    "telefone" TEXT,
+    "tokenAcesso" TEXT NOT NULL,
+    "codigoConvite" TEXT NOT NULL,
+    "consentimentoEm" DATETIME,
+    "status" TEXT NOT NULL DEFAULT 'ATIVO',
+    "dataNascimento" DATETIME,
+    "sexo" TEXT,
+    "alturaCm" INTEGER,
+    "objetivo" TEXT,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "vinculos" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "profissionalId" TEXT NOT NULL,
+    "tipo" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'ATIVO',
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "aceitoEm" DATETIME,
+    CONSTRAINT "vinculos_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "vinculos_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "profissionais" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "planos_nutricionais" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "metaKcal" INTEGER NOT NULL,
+    "metaProteina" INTEGER NOT NULL,
+    "metaCarbo" INTEGER NOT NULL,
+    "metaGordura" INTEGER NOT NULL,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "planos_nutricionais_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "treinos_prescritos" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "nome" TEXT NOT NULL,
+    "descricao" TEXT NOT NULL,
+    "diasPorSemana" INTEGER NOT NULL,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "treinos_prescritos_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "refeicoes" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "clienteRegistroId" TEXT NOT NULL,
+    "origem" TEXT NOT NULL,
+    "entradaBruta" TEXT NOT NULL,
+    "itens" TEXT NOT NULL,
+    "kcal" INTEGER NOT NULL,
+    "proteina" INTEGER NOT NULL,
+    "carbo" INTEGER NOT NULL,
+    "gordura" INTEGER NOT NULL,
+    "confianca" REAL NOT NULL,
+    "registradoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "refeicoes_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "sessoes_treino" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "clienteRegistroId" TEXT NOT NULL,
+    "origem" TEXT NOT NULL,
+    "entradaBruta" TEXT NOT NULL,
+    "realizadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "sessoes_treino_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "medidas" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "pesoKg" REAL NOT NULL,
+    "registradoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "medidas_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "anotacoes" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "profissionalId" TEXT NOT NULL,
+    "texto" TEXT NOT NULL,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "anotacoes_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "anotacoes_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "profissionais" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "favoritos" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "descricao" TEXT NOT NULL,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "favoritos_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "anamnese_nutricional" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "jaSeguiuDieta" BOOLEAN,
+    "restricoesAlimentares" TEXT,
+    "usaSuplemento" BOOLEAN,
+    "refeicoesPorDia" INTEGER,
+    "consumoAlcool" TEXT,
+    "observacoes" TEXT,
+    "atualizadoEm" DATETIME NOT NULL,
+    CONSTRAINT "anamnese_nutricional_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "anamnese_treino" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "experiencia" TEXT,
+    "lesoesLimitacoes" TEXT,
+    "frequenciaAtual" INTEGER,
+    "praticaOutroEsporte" TEXT,
+    "observacoes" TEXT,
+    "atualizadoEm" DATETIME NOT NULL,
+    CONSTRAINT "anamnese_treino_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "clientes_tokenAcesso_key" ON "clientes"("tokenAcesso");
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "clientes_codigoConvite_key" ON "clientes"("codigoConvite");
+
+-- CreateIndex
+-- Fase 2 criou este índice como unique simples, o que impedia guardar o
+-- histórico: trocar de nutricionista exigiria sobrescrever a linha do
+-- anterior. Substituído pelo índice parcial logo abaixo. DROP é seguro e
+-- idempotente — se já foi trocado, não existe mais nada pra derrubar.
+DROP INDEX IF EXISTS "vinculos_clienteId_tipo_key";
+
+-- CreateIndex
+-- A regra "um nutricionista e um personal por cliente" vale só entre
+-- vínculos vivos. Encerrados ficam para sempre, quantos forem, como
+-- registro de quem atendeu quem. SQLite suporta índice parcial, coisa que
+-- o Prisma não sabe declarar no schema, então mora aqui.
+CREATE UNIQUE INDEX IF NOT EXISTS "vinculos_cliente_tipo_vivo"
+    ON "vinculos"("clienteId", "tipo") WHERE "status" <> 'ENCERRADO';
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "vinculos_clienteId_tipo_idx" ON "vinculos"("clienteId", "tipo");
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "refeicoes_clienteRegistroId_key" ON "refeicoes"("clienteRegistroId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "sessoes_treino_clienteRegistroId_key" ON "sessoes_treino"("clienteRegistroId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "anamnese_nutricional_clienteId_key" ON "anamnese_nutricional"("clienteId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "anamnese_treino_clienteId_key" ON "anamnese_treino"("clienteId");
