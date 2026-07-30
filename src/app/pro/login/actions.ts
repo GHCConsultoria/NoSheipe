@@ -33,12 +33,28 @@ export async function entrarProfissional(
   }
 
   const supabase = await criarClienteSupabaseServidor();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.senha,
   });
-  if (error) {
+  if (error || !data.user) {
     return { erro: "e-mail ou senha incorretos" };
+  }
+
+  // Autenticar não basta: sem a linha Profissional o painel não abre e o
+  // layout devolve pra cá. Sem esta checagem o login "dá certo", a pessoa
+  // volta pro login sem mensagem nenhuma e não tem como adivinhar o
+  // motivo — foi o que aconteceu de verdade antes disto existir.
+  const profissional = await prismaNutri.profissional.findUnique({ where: { authUserId: data.user.id } });
+  if (!profissional) {
+    // Sai da sessão pra não deixar meio-autenticado, quicando entre /pro e
+    // /pro/login a cada navegação.
+    await supabase.auth.signOut();
+    return {
+      erro:
+        "sua senha está certa, mas o cadastro nunca foi concluído. Use “criar conta” aqui embaixo, " +
+        "com este mesmo e-mail e senha, pra terminar — nada é duplicado.",
+    };
   }
 
   redirect("/pro");
