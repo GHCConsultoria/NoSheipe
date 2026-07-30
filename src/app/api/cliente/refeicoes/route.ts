@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "../../../../../prisma/nutri/generated";
 import { prismaNutri } from "@/lib/nutri/prisma";
 import { StatusCliente, registrarSchema } from "@/lib/cliente/schemas";
-import { extrairMacros, IaRespostaInvalidaError, IaNaoConfiguradaError } from "@/lib/nutri/ia";
+import { extrairMacros, IaRespostaInvalidaError, IaNaoConfiguradaError, IaIndisponivelError } from "@/lib/nutri/ia";
 
 function serializar(registro: {
   id: string;
@@ -65,8 +65,20 @@ export async function POST(request: NextRequest) {
   try {
     macros = await extrairMacros(parsed.data.rawText);
   } catch (erro) {
-    if (erro instanceof IaRespostaInvalidaError || erro instanceof IaNaoConfiguradaError) {
+    if (erro instanceof IaRespostaInvalidaError) {
+      // A IA respondeu, mas não num formato aproveitável pra ESTA descrição —
+      // a mensagem específica ajuda a pessoa a reformular o relato.
       return NextResponse.json({ erro: erro.message }, { status: 422 });
+    }
+    if (erro instanceof IaIndisponivelError || erro instanceof IaNaoConfiguradaError) {
+      // Pane do provedor (sem crédito, limite, fora do ar) ou chave ausente:
+      // o detalhe vai pro log do servidor; pra pessoa, uma mensagem clara e
+      // sem jargão, em vez do "falha ao registrar" genérico de um 500.
+      console.error("[refeicoes] estimativa de macros indisponível:", erro.message);
+      return NextResponse.json(
+        { erro: "a estimativa automática está indisponível no momento — tente de novo em instantes" },
+        { status: 503 },
+      );
     }
     throw erro;
   }

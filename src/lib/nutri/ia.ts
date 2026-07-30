@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { gerarTexto, IaNaoConfiguradaError } from "@/lib/ia/anthropic";
+import { gerarTexto, IaNaoConfiguradaError, IaIndisponivelError } from "@/lib/ia/provedor";
 
-export { IaNaoConfiguradaError };
+export { IaNaoConfiguradaError, IaIndisponivelError };
 export class IaRespostaInvalidaError extends Error {}
 
 const itemSchema = z.object({
