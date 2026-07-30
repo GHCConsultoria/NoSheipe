@@ -361,3 +361,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS "anamnese_nutricional_clienteId_key" ON "anamn
 
 -- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "anamnese_treino_clienteId_key" ON "anamnese_treino"("clienteId");
+
+-- AlterTable
+-- Remoção de registro é mudança de status (marca a hora), nunca DELETE — a
+-- extensão em src/lib/nutri/prisma.ts esconde o que tem removidoEm de toda
+-- leitura. ALTER ADD COLUMN não tem "IF NOT EXISTS" no SQLite; aplicar-schema
+-- tolera o "duplicate column name" da segunda passada, então isto é idempotente.
+ALTER TABLE "refeicoes" ADD COLUMN "removidoEm" DATETIME;
+ALTER TABLE "sessoes_treino" ADD COLUMN "removidoEm" DATETIME;

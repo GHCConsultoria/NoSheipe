@@ -217,6 +217,11 @@ model Refeicao {
 
   registradoEm DateTime @default(now())
 
+  // Nunca exclusão física: uma refeição registrada errada (a IA estimou
+  // mal, ou o cliente descreveu outra coisa) é removida marcando aqui a
+  // hora. A linha fica; some de toda leitura via a extensão em prisma.ts.
+  removidoEm DateTime?
+
   @@map("refeicoes")
 }
 
@@ -233,6 +238,9 @@ model SessaoTreino {
   entradaBruta String
 
   realizadoEm DateTime @default(now())
+
+  // Simétrico a Refeicao — o cliente pode ter marcado um treino que não fez.
+  removidoEm DateTime?
 
   @@map("sessoes_treino")
 }

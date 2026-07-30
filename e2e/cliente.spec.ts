@@ -27,6 +27,22 @@ test.describe("cliente registra o dia", () => {
     await expect(page.getByText(/500 kcal/).first()).toBeVisible();
   });
 
+  test("remover uma refeição a tira da lista", async ({ page }) => {
+    await page.goto("/p/demo-marina-souza");
+
+    const relato = "refeição pra remover no teste";
+    await page.getByPlaceholder(/peito de frango grelhado/i).fill(relato);
+    await page.getByRole("button", { name: "Registrar refeição" }).click();
+    await expect(page.getByText(relato)).toBeVisible({ timeout: 15_000 });
+
+    // O botão de remover confirma via window.confirm — o Playwright cancela
+    // diálogos por padrão, então é preciso aceitar explicitamente.
+    page.on("dialog", (d) => d.accept());
+    await page.getByRole("button", { name: `Remover ${relato}` }).click();
+
+    await expect(page.getByText(relato)).toBeHidden({ timeout: 10_000 });
+  });
+
   test("registrar peso confirma sem erro", async ({ page }) => {
     await page.goto("/p/demo-marina-souza");
 
