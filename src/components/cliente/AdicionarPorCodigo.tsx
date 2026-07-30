@@ -97,7 +97,7 @@ export function AdicionarPorCodigo({ ehNutricionista, ehPersonal }: Props) {
         <button
           type="submit"
           disabled={pendente || !codigo.trim()}
-          className="rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
+          className="tatil rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
         >
           {pendente ? "Enviando…" : "Pedir acompanhamento"}
         </button>

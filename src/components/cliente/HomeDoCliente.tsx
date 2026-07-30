@@ -8,6 +8,7 @@ import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/compo
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
 import { registrarPeso, registrarTreino, removerFavorito, salvarFavorito } from "@/lib/cliente/publico";
+import { AnelDeProgresso, type Arco } from "@/components/shared/AnelDeProgresso";
 
 interface SaldoMacro {
   consumido: number;
@@ -69,20 +70,23 @@ export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, tr
           </p>
           <Link
             href={`/p/${token}/perfil`}
-            className="rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep"
+            className="tatil rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep"
           >
             {solicitacoesPendentes > 0 ? "Ver quem pediu" : "Pegar meu código"}
           </Link>
         </div>
       ) : (
         <>
-          <section className="mt-6 flex flex-col gap-3">
-            {nutricao && <ResumoDieta saldo={nutricao.saldo} />}
-            {treino && <ResumoTreino aderencia={treino.aderenciaSemana} nome={treino.treino?.nome ?? null} />}
+          <section className="mt-8">
+            <AnelDeProgresso arcos={montarArcos(nutricao, treino)} />
           </section>
 
+          {treino && !treino.aderenciaSemana && (
+            <p className="mt-4 text-center text-sm text-attention">Seu personal ainda não prescreveu um treino.</p>
+          )}
+
           {nutricao && (
-            <div className="mt-4">
+            <div className="mt-6 flex justify-center">
               <CompartilharResumoDoDia nomePaciente={nome} saldo={nutricao.saldo} />
             </div>
           )}
@@ -97,64 +101,36 @@ export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, tr
   );
 }
 
-interface Saldo {
-  kcal: SaldoMacro;
-  proteina: SaldoMacro;
-  carbo: SaldoMacro;
-  gordura: SaldoMacro;
-}
+/**
+ * Traduz os blocos do painel nos arcos do anel. A ordem importa: dieta por
+ * fora, treino por dentro, e o primeiro da lista é quem leva o número
+ * grande no centro. Quem só tem treino vê o treino no lugar de honra.
+ *
+ * Só entra arco de treino se existir treino prescrito — sem meta não há
+ * percentual honesto a desenhar, e a tela avisa isso em texto.
+ */
+function montarArcos(nutricao: Props["nutricao"], treino: Props["treino"]): Arco[] {
+  const arcos: Arco[] = [];
 
-function ResumoDieta({ saldo }: { saldo: Saldo }) {
-  const estourou = saldo.kcal.percentual > 100;
-  return (
-    <div className="paper-card rounded-sm p-4">
-      <div className="flex items-baseline justify-between">
-        <p className="eyebrow">Dieta hoje</p>
-        <p className={`font-display text-2xl ${estourou ? "text-urgent" : ""}`}>{saldo.kcal.percentual}%</p>
-      </div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-rule">
-        <div
-          className={`h-full ${estourou ? "bg-urgent" : "bg-sheipe"}`}
-          style={{ width: `${Math.min(saldo.kcal.percentual, 100)}%` }}
-        />
-      </div>
-      <p className="mt-2 text-xs text-ink-faint">
-        {saldo.kcal.consumido} / {saldo.kcal.meta} kcal · {saldo.proteina.consumido}g P · {saldo.carbo.consumido}g C ·{" "}
-        {saldo.gordura.consumido}g G
-      </p>
-    </div>
-  );
-}
-
-function ResumoTreino({
-  aderencia,
-  nome,
-}: {
-  aderencia: { diasTreinados: number; diasPorSemana: number; percentual: number } | null;
-  nome: string | null;
-}) {
-  if (!aderencia) {
-    return (
-      <div className="paper-card rounded-sm p-4">
-        <p className="eyebrow">Treino</p>
-        <p className="mt-1 text-sm text-attention">Seu personal ainda não prescreveu um treino.</p>
-      </div>
-    );
+  if (nutricao) {
+    arcos.push({
+      percentual: nutricao.saldo.kcal.percentual,
+      rotulo: "Dieta hoje",
+      detalhe: `${nutricao.saldo.kcal.consumido} / ${nutricao.saldo.kcal.meta} kcal`,
+      cor: "sheipe",
+    });
   }
-  return (
-    <div className="paper-card rounded-sm p-4">
-      <div className="flex items-baseline justify-between">
-        <p className="eyebrow">Treino na semana</p>
-        <p className="font-display text-2xl">{aderencia.percentual}%</p>
-      </div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-rule">
-        <div className="h-full bg-sheipe" style={{ width: `${Math.min(aderencia.percentual, 100)}%` }} />
-      </div>
-      <p className="mt-2 text-xs text-ink-faint">
-        {aderencia.diasTreinados} de {aderencia.diasPorSemana} dias{nome ? ` · ${nome}` : ""}
-      </p>
-    </div>
-  );
+
+  if (treino?.aderenciaSemana) {
+    arcos.push({
+      percentual: treino.aderenciaSemana.percentual,
+      rotulo: "Treino na semana",
+      detalhe: `${treino.aderenciaSemana.diasTreinados} de ${treino.aderenciaSemana.diasPorSemana} dias`,
+      cor: "treino",
+    });
+  }
+
+  return arcos;
 }
 
 function BlocoRefeicao({
@@ -295,7 +271,7 @@ function BlocoRefeicao({
         <button
           type="submit"
           disabled={pendente || gravando || !texto.trim()}
-          className="self-start rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
+          className="tatil self-start rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
         >
           {pendente ? "Estimando macros…" : "Registrar refeição"}
         </button>
@@ -379,7 +355,7 @@ function BlocoTreino({
         <button
           type="submit"
           disabled={pendente || !texto.trim()}
-          className="self-start rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
+          className="tatil self-start rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
         >
           {pendente ? "Registrando…" : "Registrar treino"}
         </button>
