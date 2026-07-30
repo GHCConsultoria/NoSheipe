@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
 import { obterProfissionalAtual } from "@/lib/profissional/auth";
 import {
   buscarClientesDoProfissional,
@@ -10,7 +9,6 @@ import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { AdicionarPorCodigo } from "@/components/cliente/AdicionarPorCodigo";
 import { AnelCompacto } from "@/components/shared/AnelCompacto";
 import { NumeroAnimado } from "@/components/shared/NumeroAnimado";
-import { sairProfissional } from "../login/actions";
 
 /**
  * Painel do profissional: um cliente por linha, com os indicadores de cada
@@ -28,35 +26,13 @@ export default async function Painel() {
   const vagasRestantes = profissional.limitePlano - totalAtivos;
 
   return (
-    <main className="entrada-aba mx-auto max-w-2xl px-6 py-16">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="mb-3">
-            <NoSheipeLogo size={24} />
-          </div>
-          <h1 className="font-display text-3xl">Olá, {profissional.nome}</h1>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {/* Só quem tem ehMaster no banco vê o link — a rota já devolve
-              404 pros outros, mas não faz sentido mostrar. */}
-          {profissional.ehMaster && (
-            <Link
-              href="/master"
-              className="rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink"
-            >
-              Admin
-            </Link>
-          )}
-          <form action={sairProfissional}>
-            <button
-              type="submit"
-              className="rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink"
-            >
-              Sair
-            </button>
-          </form>
-        </div>
+    <main className="entrada-aba mx-auto max-w-2xl px-6 py-10 sm:py-16">
+      {/* "Sair" e "Admin" moraram aqui até a barra de abas existir; agora
+          vivem na aba Conta, e o cabeçalho volta a ser só o cabeçalho. */}
+      <div className="mb-3">
+        <NoSheipeLogo size={24} />
       </div>
+      <h1 className="font-display text-3xl">Olá, {profissional.nome}</h1>
 
       <p className="mt-2 text-sm text-ink-soft">
         <NumeroAnimado valor={totalAtivos} /> de {profissional.limitePlano} acompanhamentos do plano
@@ -65,18 +41,9 @@ export default async function Painel() {
 
       <div className="mt-6 flex flex-col gap-3">
         {vagasRestantes > 0 ? (
-          <>
-            <Link
-              href="/pro/clientes/novo"
-              className="tatil inline-flex w-fit items-center gap-1.5 rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep"
-            >
-              <Plus size={15} strokeWidth={2} /> Novo cliente
-            </Link>
-            <AdicionarPorCodigo
-              ehNutricionista={profissional.ehNutricionista}
-              ehPersonal={profissional.ehPersonal}
-            />
-          </>
+          // "Novo cliente" virou aba; aqui fica só o caminho do código,
+          // que é o menos óbvio dos dois e precisa de explicação.
+          <AdicionarPorCodigo ehNutricionista={profissional.ehNutricionista} ehPersonal={profissional.ehPersonal} />
         ) : (
           <p className="text-sm text-urgent">
             Limite de {profissional.limitePlano} atingido — encerre um acompanhamento pra liberar vaga.
