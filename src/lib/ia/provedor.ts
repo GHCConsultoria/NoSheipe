@@ -18,7 +18,7 @@ export class IaNaoConfiguradaError extends Error {}
 /** O provedor existe mas recusou/falhou agora (crédito, limite, rede, 5xx). */
 export class IaIndisponivelError extends Error {}
 
-export type NomeProvedor = "groq" | "anthropic";
+export type NomeProvedor = "gemini" | "groq" | "anthropic";
 
 export interface Provedor {
   nome: NomeProvedor;
@@ -37,8 +37,9 @@ export interface RequisicaoIa {
   body: string;
 }
 
-// Modelos padrão. Groq: um modelo aberto e gratuito, bom o bastante pra
-// devolver o JSON de macros. Anthropic: mantém o que já estava em uso.
+// Modelos padrão. Gemini e Groq: modelos de tier gratuito, bons o bastante
+// pra devolver o JSON de macros. Anthropic: mantém o que já estava em uso.
+const MODELO_GEMINI_PADRAO = "gemini-2.0-flash";
 const MODELO_GROQ_PADRAO = "llama-3.3-70b-versatile";
 const MODELO_ANTHROPIC_PADRAO = "claude-sonnet-5";
 
@@ -47,6 +48,8 @@ interface EnvIa {
   // que sem isto dispara a checagem de "weak type" do TS).
   [chave: string]: string | undefined;
   IA_PROVEDOR?: string;
+  GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
   GROQ_API_KEY?: string;
   GROQ_MODEL?: string;
   ANTHROPIC_API_KEY?: string;
@@ -55,13 +58,16 @@ interface EnvIa {
 
 /**
  * Escolhe o provedor a partir das variáveis de ambiente. Sem preferência
- * explícita (IA_PROVEDOR), Groq vem primeiro por ser o gratuito; Anthropic
- * entra só como reserva. Devolve null quando nenhuma chave existe — aí quem
- * chama lança IaNaoConfiguradaError.
+ * explícita (IA_PROVEDOR), os gratuitos vêm primeiro (Gemini, depois Groq);
+ * Anthropic entra só como reserva. Devolve null quando nenhuma chave existe
+ * — aí quem chama lança IaNaoConfiguradaError.
  */
 export function selecionarProvedor(env: EnvIa): Provedor | null {
   const preferido = env.IA_PROVEDOR?.trim().toLowerCase();
 
+  const gemini: Provedor | null = env.GEMINI_API_KEY
+    ? { nome: "gemini", apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODEL || MODELO_GEMINI_PADRAO }
+    : null;
   const groq: Provedor | null = env.GROQ_API_KEY
     ? { nome: "groq", apiKey: env.GROQ_API_KEY, modelo: env.GROQ_MODEL || MODELO_GROQ_PADRAO }
     : null;
@@ -69,15 +75,33 @@ export function selecionarProvedor(env: EnvIa): Provedor | null {
     ? { nome: "anthropic", apiKey: env.ANTHROPIC_API_KEY, modelo: env.ANTHROPIC_MODEL || MODELO_ANTHROPIC_PADRAO }
     : null;
 
-  if (preferido === "anthropic" && anthropic) return anthropic;
+  if (preferido === "gemini" && gemini) return gemini;
   if (preferido === "groq" && groq) return groq;
+  if (preferido === "anthropic" && anthropic) return anthropic;
 
-  return groq ?? anthropic;
+  return gemini ?? groq ?? anthropic;
 }
 
 /** Monta URL, headers e corpo no formato do provedor escolhido. */
 export function montarRequisicao(provedor: Provedor, prompt: string, maxTokens: number): RequisicaoIa {
   const mensagens = [{ role: "user", content: prompt }];
+
+  if (provedor.nome === "gemini") {
+    // Gemini (Generative Language API). A chave vai no header x-goog-api-key,
+    // não na URL, pra não vazar em log de requisição. responseMimeType força
+    // JSON puro, o que casa com o que extrairMacros espera.
+    return {
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${provedor.modelo}:generateContent`,
+      headers: {
+        "x-goog-api-key": provedor.apiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: maxTokens, responseMimeType: "application/json" },
+      }),
+    };
+  }
 
   if (provedor.nome === "groq") {
     // Groq fala o dialeto OpenAI (chat/completions).
@@ -102,6 +126,9 @@ export function montarRequisicao(provedor: Provedor, prompt: string, maxTokens: 
   };
 }
 
+interface RespostaGemini {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+}
 interface RespostaGroq {
   choices?: Array<{ message?: { content?: string } }>;
 }
@@ -111,6 +138,14 @@ interface RespostaAnthropic {
 
 /** Extrai o texto da resposta, cada provedor no seu formato. Null se não veio. */
 export function extrairTexto(provedor: Provedor, dados: unknown): string | null {
+  if (provedor.nome === "gemini") {
+    const gemini = dados as RespostaGemini;
+    const partes = gemini.candidates?.[0]?.content?.parts;
+    if (!partes) return null;
+    // A resposta pode vir fatiada em vários parts — junta tudo.
+    const texto = partes.map((parte) => parte.text ?? "").join("").trim();
+    return texto || null;
+  }
   if (provedor.nome === "groq") {
     const groq = dados as RespostaGroq;
     return groq.choices?.[0]?.message?.content ?? null;
