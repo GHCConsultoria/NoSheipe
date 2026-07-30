@@ -70,6 +70,12 @@ export default function LoginProfissional() {
               <CampoSenha autoComplete="current-password" />
               {estado.erro && <p className="text-sm text-urgent">{estado.erro}</p>}
               <Botao rotulo="Entrar" rotuloCarregando="Entrando…" />
+              <a
+                href="/pro/recuperar"
+                className="text-center text-sm text-ink-soft underline underline-offset-4 hover:text-ink"
+              >
+                Esqueci minha senha
+              </a>
             </form>
           ) : (
             <form action={acaoCadastrar} className="mt-6 flex flex-col gap-4">

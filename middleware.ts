@@ -5,6 +5,12 @@ import { NextResponse, type NextRequest } from "next/server";
 // seu login); com o Profissional unificado é só uma.
 const AREA_PROFISSIONAL = { prefixo: "/pro", login: "/pro/login" };
 
+// Páginas de auth que precisam abrir SEM sessão — senão quem esqueceu a
+// senha nunca chegaria à tela de pedir a recuperação. A /pro/redefinir fica
+// de fora: ela exige a sessão de recuperação que o callback cria, então é
+// gate normal.
+const ROTAS_AUTH_PUBLICAS = [AREA_PROFISSIONAL.login, "/pro/recuperar"];
+
 // /master usa o mesmo login: é um profissional com ehMaster no banco, não
 // uma conta à parte. Aqui só se confere que existe sessão; quem confere a
 // permissão em si é src/app/master/layout.tsx — o middleware roda no edge
@@ -58,8 +64,8 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const ehRotaDeLogin = request.nextUrl.pathname.startsWith(area.login);
-  if (!user && !ehRotaDeLogin) {
+  const ehRotaAuthPublica = ROTAS_AUTH_PUBLICAS.some((rota) => request.nextUrl.pathname.startsWith(rota));
+  if (!user && !ehRotaAuthPublica) {
     const destino = request.nextUrl.clone();
     destino.pathname = area.login;
     return NextResponse.redirect(destino);

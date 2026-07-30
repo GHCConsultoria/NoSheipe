@@ -50,3 +50,21 @@ test.describe("painel do profissional", () => {
     await expect(page.getByText(nome)).toBeVisible();
   });
 });
+
+test.describe("recuperação de senha", () => {
+  test("do login chega à tela de recuperar e o envio dispara a ação", async ({ page }) => {
+    await page.goto("/pro/login");
+    await page.getByRole("link", { name: "Esqueci minha senha" }).click();
+
+    await expect(page).toHaveURL(/\/pro\/recuperar$/);
+    await expect(page.getByRole("heading", { name: "Recuperar senha" })).toBeVisible();
+
+    await page.getByLabel("E-mail").fill("alguem@exemplo.com");
+    await page.getByRole("button", { name: "Enviar link" }).click();
+
+    // Sem Supabase no E2E (ver playwright.config), a Server Action bate no
+    // guard de "não configurado" — o que já prova que o POST roda de ponta a
+    // ponta, que é o caminho que build e tsc não pegam.
+    await expect(page.getByText(/Supabase ainda não está configurado/i)).toBeVisible({ timeout: 10_000 });
+  });
+});
