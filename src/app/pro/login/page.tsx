@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { entrarProfissional, cadastrarProfissional, type EstadoLoginProfissional } from "./actions";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
+import { ThemeToggle } from "@/components/nutri/ThemeToggle";
 
 const ESTADO_INICIAL: EstadoLoginProfissional = {};
 
@@ -20,6 +21,7 @@ export default function LoginProfissional() {
   const estado = modo === "entrar" ? estadoEntrar : estadoCadastrar;
 
   return (
+    <>
     <main className="entrada-aba grid min-h-screen sm:grid-cols-2">
       <section
         className="hidden flex-col justify-between p-12 sm:flex"
@@ -132,6 +134,10 @@ export default function LoginProfissional() {
         </div>
       </section>
     </main>
+      {/* Flutuante aqui é seguro: o login fica fora do grupo (painel) e
+          portanto não tem barra de abas no rodapé pra disputar. */}
+      <ThemeToggle />
+    </>
   );
 }
 
