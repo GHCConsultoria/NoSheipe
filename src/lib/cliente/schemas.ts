@@ -154,6 +154,11 @@ export const removerFavoritoSchema = tokenSchema.extend({
   favoritoId: z.string().min(1),
 });
 
+/** Remover um registro do próprio cliente (refeição ou sessão de treino). */
+export const removerRegistroSchema = tokenSchema.extend({
+  registroId: z.string().min(1),
+});
+
 /** Mesmo alfabeto de gerarCodigoConvite — sem 0/O e 1/I. */
 const ALFABETO_CONVITE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 

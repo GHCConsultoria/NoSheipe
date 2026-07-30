@@ -9,6 +9,7 @@ import {
   registrarPesoSchema,
   registrarSchema,
   removerFavoritoSchema,
+  removerRegistroSchema,
   tokenSchema,
   vinculoDoClienteSchema,
 } from "@/lib/cliente/schemas";
@@ -180,6 +181,52 @@ export async function registrarTreino(input: unknown): Promise<ResultadoAcaoPubl
     if (jaSalvo) return { sucesso: true };
     throw erro;
   }
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Remove uma refeição registrada errada — a IA estimou mal, ou o cliente
+ * descreveu outra coisa. Nunca DELETE: marca removidoEm, e a extensão do
+ * client some com ela de toda leitura (o anel volta ao número certo).
+ *
+ * O findFirst já não enxerga removidas, então remover de novo devolve "não
+ * encontrado" em vez de mexer na linha duas vezes; e o filtro por clienteId
+ * é o que impede remover a refeição de outra pessoa sabendo só o id.
+ */
+export async function removerRefeicao(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = removerRegistroSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const refeicao = await prismaNutri.refeicao.findFirst({
+    where: { id: parsed.data.registroId, clienteId: cliente.id },
+  });
+  if (!refeicao) return { sucesso: false, erro: "registro não encontrado" };
+
+  await prismaNutri.refeicao.update({ where: { id: refeicao.id }, data: { removidoEm: new Date() } });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/** Simétrico a removerRefeicao — um treino que o cliente marcou mas não fez. */
+export async function removerSessaoTreino(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = removerRegistroSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const sessao = await prismaNutri.sessaoTreino.findFirst({
+    where: { id: parsed.data.registroId, clienteId: cliente.id },
+  });
+  if (!sessao) return { sucesso: false, erro: "registro não encontrado" };
+
+  await prismaNutri.sessaoTreino.update({ where: { id: sessao.id }, data: { removidoEm: new Date() } });
 
   revalidatePath(`/p/${parsed.data.token}`);
   return { sucesso: true };

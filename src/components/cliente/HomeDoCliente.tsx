@@ -7,7 +7,14 @@ import { Mic, Square, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
-import { registrarPeso, registrarTreino, removerFavorito, salvarFavorito } from "@/lib/cliente/publico";
+import {
+  registrarPeso,
+  registrarTreino,
+  removerFavorito,
+  removerRefeicao,
+  removerSessaoTreino,
+  salvarFavorito,
+} from "@/lib/cliente/publico";
 import { AnelDeProgresso, type Arco } from "@/components/shared/AnelDeProgresso";
 
 interface SaldoMacro {
@@ -283,7 +290,26 @@ function BlocoRefeicao({
             <li key={r.id} className="paper-card rounded-sm p-4">
               <div className="flex items-baseline justify-between gap-3">
                 <p className="text-sm">{r.entradaBruta}</p>
-                <span className="font-data shrink-0 text-xs text-ink-faint">{r.horario}</span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="font-data text-xs text-ink-faint">{r.horario}</span>
+                  <button
+                    type="button"
+                    disabled={pendente}
+                    aria-label={`Remover ${r.entradaBruta}`}
+                    // A estimativa da IA vira o anel inteiro; um registro
+                    // errado precisa de saída, senão envenena o número do dia.
+                    onClick={() => {
+                      if (!window.confirm("Remover este registro? O total do dia é recalculado.")) return;
+                      iniciarTransicao(async () => {
+                        await removerRefeicao({ token, registroId: r.id });
+                        router.refresh();
+                      });
+                    }}
+                    className="tatil text-ink-faint transition-colors hover:text-urgent disabled:opacity-50"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
               <p className="mt-1 text-xs text-ink-faint">
                 {r.kcal} kcal · {r.proteina}g P · {r.carbo}g C · {r.gordura}g G ·{" "}
@@ -367,7 +393,24 @@ function BlocoTreino({
             <li key={s.id} className="paper-card rounded-sm p-4">
               <div className="flex items-baseline justify-between gap-3">
                 <p className="text-sm">{s.entradaBruta}</p>
-                <span className="font-data shrink-0 text-xs text-ink-faint">{s.horario}</span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="font-data text-xs text-ink-faint">{s.horario}</span>
+                  <button
+                    type="button"
+                    disabled={pendente}
+                    aria-label={`Remover ${s.entradaBruta}`}
+                    onClick={() => {
+                      if (!window.confirm("Remover este treino? A aderência da semana é recalculada.")) return;
+                      iniciarTransicao(async () => {
+                        await removerSessaoTreino({ token, registroId: s.id });
+                        router.refresh();
+                      });
+                    }}
+                    className="tatil text-ink-faint transition-colors hover:text-urgent disabled:opacity-50"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
             </li>
           ))}
