@@ -7,7 +7,7 @@ export default function Home() {
   return (
     <>
       <ScriptSemFlashDeTema />
-      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 px-6 py-16">
+      <main className="entrada-aba mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 px-6 py-16">
         <div>
           <NoSheipeLogo size={28} />
           <h1 className="font-display mt-4 text-3xl">Acompanhamento entre consultas</h1>
@@ -17,7 +17,7 @@ export default function Home() {
         {/* Uma entrada só: nutricionista e personal usam o mesmo login, e o
             painel se ajusta ao que a pessoa marcou no cadastro. */}
         <div className="flex flex-col gap-3">
-          <Link href="/pro/login" className="paper-card rounded-sm p-5 transition-colors hover:border-sheipe">
+          <Link href="/pro/login" className="tatil paper-card rounded-sm p-5 transition-colors hover:border-sheipe">
             <p className="font-display text-lg">Sou profissional</p>
             <p className="mt-1 text-sm text-ink-soft">
               Nutricionista, personal trainer ou os dois: prescreva e acompanhe a aderência num só painel.

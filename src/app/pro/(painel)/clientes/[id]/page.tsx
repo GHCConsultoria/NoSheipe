@@ -44,7 +44,7 @@ export default async function FichaCliente({ params }: { params: { id: string } 
   ].filter(Boolean);
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
+    <main className="entrada-aba mx-auto max-w-2xl px-6 py-16">
       <Link href="/pro" className="inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-sheipe">
         <ArrowLeft size={15} strokeWidth={1.75} /> voltar para o painel
       </Link>

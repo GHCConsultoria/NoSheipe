@@ -50,7 +50,7 @@ export function ConsentimentoCliente({ token, nome }: { token: string; nome: str
         type="button"
         onClick={continuar}
         disabled={!aceito || pendente}
-        className="rounded-sm bg-sheipe px-4 py-2.5 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
+        className="tatil rounded-sm bg-sheipe px-4 py-2.5 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
       >
         {pendente ? "Confirmando…" : "Aceitar e continuar"}
       </button>

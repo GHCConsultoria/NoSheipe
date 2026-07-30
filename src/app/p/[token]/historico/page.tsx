@@ -33,13 +33,17 @@ export default async function HistoricoCliente({ params }: { params: { token: st
         <p className="mt-8 text-sm text-ink-faint">Nenhum registro ainda.</p>
       ) : (
         <ul className="mt-6 flex flex-col gap-3">
-          {historico.map((dia) => {
+          {historico.map((dia, indice) => {
             // diaChave é yyyy-mm-dd em SP; o T12:00 evita o dia "voltar" um
             // ao ser reinterpretado como UTC na formatação.
             const data = new Date(`${dia.diaChave}T12:00:00Z`);
             const fora = estaForaDaMeta(dia.saldo.kcal.percentual);
             return (
-              <li key={dia.diaChave} className={`paper-card rounded-sm p-4 ${fora ? "border-l-[3px] border-l-urgent-line" : ""}`}>
+              <li
+                key={dia.diaChave}
+                className={`stagger-in paper-card rounded-sm p-4 ${fora ? "border-l-[3px] border-l-urgent-line" : ""}`}
+                style={{ "--stagger-index": indice } as React.CSSProperties}
+              >
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="text-sm capitalize">{FORMATADOR_DIA.format(data)}</p>
                   <span className={`font-data text-xs ${fora ? "text-urgent" : "text-ink-soft"}`}>
@@ -51,9 +55,16 @@ export default async function HistoricoCliente({ params }: { params: { token: st
                   {dia.saldo.carbo.consumido}g C · {dia.saldo.gordura.consumido}g G
                 </p>
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-rule">
+                  {/* Preenche junto com a entrada do item, no mesmo ritmo
+                      escalonado — a lista inteira "desenha" de cima pra baixo. */}
                   <div
-                    className={`h-full ${dia.saldo.kcal.percentual > 100 ? "bg-urgent" : "bg-sheipe"}`}
-                    style={{ width: `${Math.min(dia.saldo.kcal.percentual, 100)}%` }}
+                    className={`barra-preenche h-full ${dia.saldo.kcal.percentual > 100 ? "bg-urgent" : "bg-sheipe"}`}
+                    style={
+                      {
+                        width: `${Math.min(dia.saldo.kcal.percentual, 100)}%`,
+                        animationDelay: `${indice * 90}ms`,
+                      } as React.CSSProperties
+                    }
                   />
                 </div>
               </li>

@@ -8,6 +8,8 @@ import {
 } from "@/lib/profissional/consultas";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { AdicionarPorCodigo } from "@/components/cliente/AdicionarPorCodigo";
+import { AnelCompacto } from "@/components/shared/AnelCompacto";
+import { NumeroAnimado } from "@/components/shared/NumeroAnimado";
 import { sairProfissional } from "../login/actions";
 
 /**
@@ -26,7 +28,7 @@ export default async function Painel() {
   const vagasRestantes = profissional.limitePlano - totalAtivos;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
+    <main className="entrada-aba mx-auto max-w-2xl px-6 py-16">
       <div className="flex items-start justify-between">
         <div>
           <div className="mb-3">
@@ -57,7 +59,7 @@ export default async function Painel() {
       </div>
 
       <p className="mt-2 text-sm text-ink-soft">
-        {totalAtivos} de {profissional.limitePlano} acompanhamentos do plano
+        <NumeroAnimado valor={totalAtivos} /> de {profissional.limitePlano} acompanhamentos do plano
         {vagasRestantes <= 0 ? " — limite atingido" : ""}.
       </p>
 
@@ -66,7 +68,7 @@ export default async function Painel() {
           <>
             <Link
               href="/pro/clientes/novo"
-              className="inline-flex w-fit items-center gap-1.5 rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep"
+              className="tatil inline-flex w-fit items-center gap-1.5 rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep"
             >
               <Plus size={15} strokeWidth={2} /> Novo cliente
             </Link>
@@ -99,18 +101,36 @@ export default async function Painel() {
       )}
 
       <ul className="mt-8 flex flex-col gap-3">
-        {clientes.map(({ cliente, nutricao, treino }) => {
+        {clientes.map(({ cliente, nutricao, treino }, indice) => {
           const emAlerta = Boolean(nutricao?.foraDaMeta || treino?.foraDoTreino);
           return (
-            <li key={cliente.id}>
+            <li key={cliente.id} className="stagger-in" style={{ "--stagger-index": indice } as React.CSSProperties}>
               <Link
                 href={`/pro/clientes/${cliente.id}`}
-                className={`paper-card block rounded-sm p-4 transition-colors hover:border-sheipe ${
+                className={`tatil paper-card block rounded-sm p-4 transition-colors hover:border-sheipe ${
                   emAlerta ? "border-l-[3px] border-l-urgent-line" : ""
                 }`}
               >
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="font-display text-lg leading-snug">{cliente.nome}</p>
+                <div className="flex items-center gap-3">
+                  {/* Os mesmos anéis da tela do cliente, em miniatura: o
+                      profissional bate o olho e já vê o que ela vê. */}
+                  <div className="flex shrink-0 gap-1.5">
+                    {nutricao && (
+                      <AnelCompacto
+                        percentual={nutricao.saldoHoje.kcal.percentual}
+                        cor={nutricao.foraDaMeta ? "urgent" : "sheipe"}
+                        atrasoMs={indice * 60}
+                      />
+                    )}
+                    {treino?.aderenciaSemana && (
+                      <AnelCompacto
+                        percentual={treino.aderenciaSemana.percentual}
+                        cor={treino.foraDoTreino ? "urgent" : "treino"}
+                        atrasoMs={indice * 60 + 80}
+                      />
+                    )}
+                  </div>
+                  <p className="font-display flex-1 text-lg leading-snug">{cliente.nome}</p>
                   <div className="flex shrink-0 gap-2">
                     {nutricao && <span className="eyebrow text-ink-faint">dieta</span>}
                     {treino && <span className="eyebrow text-ink-faint">treino</span>}
