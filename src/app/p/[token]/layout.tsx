@@ -48,7 +48,7 @@ export default async function LayoutDoCliente({
     <>
       {/* pb-24 reserva a altura da barra fixa; sem isso ela cobre o fim da
           página, que é justo onde ficam os botões de registrar. */}
-      <div className="pb-24">{children}</div>
+      <div className="entrada-aba pb-24">{children}</div>
       <NavRodape token={params.token} pendentes={pendentes} mostrarHistorico={temNutricao} />
     </>
   );

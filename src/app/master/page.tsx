@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { buscarMetricasGerais, buscarProfissionais } from "@/lib/master/consultas";
+import { buscarClientes, buscarMetricasGerais, buscarProfissionais } from "@/lib/master/consultas";
+import { NumeroAnimado } from "@/components/shared/NumeroAnimado";
 import { ehErroDeAutenticacao, obterMasterAtual } from "@/lib/profissional/auth";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 
@@ -42,7 +43,11 @@ export default async function PainelMaster() {
     notFound();
   }
 
-  const [metricas, profissionais] = await Promise.all([buscarMetricasGerais(), buscarProfissionais()]);
+  const [metricas, profissionais, clientes] = await Promise.all([
+    buscarMetricasGerais(),
+    buscarProfissionais(),
+    buscarClientes(),
+  ]);
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
@@ -125,10 +130,46 @@ export default async function PainelMaster() {
         {profissionais.length === 0 && <p className="text-sm text-ink-faint">Nenhum profissional cadastrado.</p>}
       </section>
 
-      <p className="mt-8 text-xs text-ink-faint">
-        Dados de saúde dos clientes — refeições, peso, anotações — não aparecem aqui de propósito: são dados sensíveis
-        de terceiros, e esta área é operacional, não clínica.
-      </p>
+      <section className="mt-10">
+        <h2 className="eyebrow mb-1">Clientes</h2>
+        <p className="mb-3 text-xs text-attention">
+          Abrir um cliente mostra dado de saúde dele — refeições, peso e as anotações de todos os profissionais que o
+          atendem. Use só quando a operação exigir.
+        </p>
+        <ul className="flex flex-col gap-2">
+          {clientes.map((c) => (
+            <li key={c.id}>
+              <Link
+                href={`/master/clientes/${c.id}`}
+                className="tatil paper-card block rounded-sm p-4 transition-colors hover:border-sheipe"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-display text-base leading-snug">
+                    {c.nome}
+                    {c.status !== "ATIVO" && <span className="eyebrow ml-2 text-ink-faint">arquivado</span>}
+                  </p>
+                  <span className="font-data shrink-0 text-xs text-ink-faint">
+                    {c.refeicoes + c.sessoes} registros
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-ink-soft">
+                  {c.acompanhantes.length > 0
+                    ? c.acompanhantes
+                        .map((a) => `${a.nome} (${a.tipo === "NUTRICAO" ? "dieta" : "treino"})`)
+                        .join(" · ")
+                    : "sem profissional ativo"}
+                </p>
+                {c.ultimoRegistroEm && (
+                  <p className="mt-1 text-xs text-ink-faint">
+                    último registro em {FORMATADOR_DATA.format(c.ultimoRegistroEm)}
+                  </p>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        {clientes.length === 0 && <p className="text-sm text-ink-faint">Nenhum cliente cadastrado.</p>}
+      </section>
     </main>
   );
 }
@@ -137,7 +178,9 @@ function Numero({ rotulo, valor, discreto = false }: { rotulo: string; valor: nu
   return (
     <div className="paper-card rounded-sm p-4">
       <p className="eyebrow">{rotulo}</p>
-      <p className={`font-display ${discreto ? "text-xl" : "text-3xl"} mt-1`}>{valor}</p>
+      <p className={`font-display ${discreto ? "text-xl" : "text-3xl"} mt-1`}>
+        <NumeroAnimado valor={valor} />
+      </p>
     </div>
   );
 }

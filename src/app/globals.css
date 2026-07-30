@@ -28,11 +28,33 @@
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
 
+  /* Segundo acento, só para treino. Verde é comida; o treino precisava de
+     um par que se distinga num relance sem brigar — e sem cair nos tons já
+     ocupados por urgente/atenção/calmo. Ciano contra verde lê como sinal
+     vital, não como enfeite. */
+  --color-treino: #22d3ee;
+  --color-treino-deep: #67e8f9;
+
   /* Fixas — não trocam com o tema. Painel de assinatura (login) fica sempre
      no mesmo tom, mesmo se o resto virar claro. */
   --signature-ink: #000000;
   --signature-paper: #e6e8eb;
   --signature-sheipe: #22c55e;
+
+  /*
+   * Movimento. Uma curva só para tudo que entra ou preenche: a mesma
+   * assinatura repetida é o que faz um app parecer coeso em vez de um
+   * amontoado de animações avulsas.
+   *
+   * --duracao-anel é longa de propósito. O anel é a peça que o cliente
+   * abre o app para ver; preencher devagar transforma o número num
+   * acontecimento em vez de um valor que já estava lá.
+   */
+  --curva-saida: cubic-bezier(0.16, 1, 0.3, 1);
+  --curva-toque: cubic-bezier(0.4, 0, 0.2, 1);
+  --duracao-rapida: 160ms;
+  --duracao-media: 360ms;
+  --duracao-anel: 1100ms;
 }
 
 @media (prefers-color-scheme: light) {
@@ -59,6 +81,8 @@
     --color-sheipe: #16a34a;
     --color-sheipe-deep: #15803d;
     --color-on-sheipe: #f0fdf4;
+    --color-treino: #0891b2;
+    --color-treino-deep: #0e7490;
 
     --shadow-card: 0 1px 2px rgba(16, 18, 21, 0.04), 0 8px 24px -12px rgba(16, 18, 21, 0.12);
   }
@@ -90,6 +114,8 @@
   --color-sheipe: #22c55e;
   --color-sheipe-deep: #4ade80;
   --color-on-sheipe: #04150a;
+  --color-treino: #22d3ee;
+  --color-treino-deep: #67e8f9;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
@@ -112,6 +138,8 @@
   --color-sheipe: #16a34a;
   --color-sheipe-deep: #15803d;
   --color-on-sheipe: #f0fdf4;
+  --color-treino: #0891b2;
+  --color-treino-deep: #0e7490;
   --shadow-card: 0 1px 2px rgba(16, 18, 21, 0.04), 0 8px 24px -12px rgba(16, 18, 21, 0.12);
 }
 
@@ -178,8 +206,38 @@ body {
   }
 
   .stagger-in {
-    animation: fade-up 560ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation: fade-up 560ms var(--curva-saida) backwards;
     animation-delay: calc(var(--stagger-index, 0) * 90ms);
+  }
+
+  /*
+   * Feedback tátil. Num app instalado no celular, o toque sem resposta é o
+   * que mais denuncia que aquilo é uma página. :active em vez de :hover
+   * porque no celular hover não existe — e o afundamento é pequeno de
+   * propósito: 0.97 se sente, 0.9 vira brinquedo.
+   */
+  .tatil {
+    transition:
+      transform var(--duracao-rapida) var(--curva-toque),
+      border-color var(--duracao-rapida) var(--curva-toque);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tatil:active {
+    transform: scale(0.97);
+  }
+
+  /* Entrada de cada tela ao trocar de aba: sobe de baixo, curto. */
+  .entrada-aba {
+    animation: entrada-aba var(--duracao-media) var(--curva-saida) backwards;
+  }
+
+  /*
+   * O anel preenche a partir do zero. A animação vive no CSS, e não em JS,
+   * pra o traço já começar no lugar certo no HTML do servidor — sem o
+   * pulo de um anel cheio que zera quando o React assume.
+   */
+  .anel-preenche {
+    animation: anel-preenche var(--duracao-anel) var(--curva-saida) backwards;
   }
 }
 
@@ -194,11 +252,41 @@ body {
   }
 }
 
+@keyframes entrada-aba {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes anel-preenche {
+  from {
+    stroke-dashoffset: var(--anel-vazio);
+  }
+}
+
+/*
+ * Quem pediu menos movimento recebe o resultado final, imediato — nunca
+ * uma tela vazia. Todo efeito acima é decoração sobre um estado que já
+ * está correto sem ele.
+ */
 @media (prefers-reduced-motion: reduce) {
-  .stagger-in {
+  .stagger-in,
+  .entrada-aba,
+  .anel-preenche {
     animation: none;
   }
   .expand {
     transition: none;
+  }
+  .tatil {
+    transition: none;
+  }
+  .tatil:active {
+    transform: none;
   }
 }

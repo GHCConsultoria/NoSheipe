@@ -1,6 +1,7 @@
 import { PrismaClient } from "./generated";
 import { PrismaLibSQL } from "@prisma/adapter-libsql";
 import { createClient } from "@libsql/client";
+import { seedPopulacaoDemo } from "./populacao-demo";
 
 const libsql = createClient({
   url: process.env.TURSO_DATABASE_URL ?? "",
@@ -431,6 +432,18 @@ async function semear() {
 
   console.log(`${CLIENTES_FAKE.length} clientes fake semeados no Turso, atribuídos a "${dono.nome}".`);
   console.log(`Pedido de vínculo pendente de "${bruno.nome}" em /p/demo-rafael-lima.`);
+
+  // População de placeholder pro painel administrativo. Opcional: sem a
+  // variável o banco fica só com os exemplos escritos à mão, que é o que
+  // se quer num ambiente de verdade.
+  if (process.env.SEED_POPULACAO_DEMO === "true") {
+    const { profissionais, clientes } = await seedPopulacaoDemo(prismaNutri);
+    console.log(
+      clientes > 0
+        ? `Populacao demo: ${profissionais} profissionais e ${clientes} clientes novos.`
+        : `Populacao demo ja existia (${profissionais} profissionais) — nada criado.`,
+    );
+  }
 
   await seedMasters();
 }

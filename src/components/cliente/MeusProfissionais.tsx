@@ -65,7 +65,7 @@ export function SolicitacoesPendentes({ token, solicitacoes }: { token: string; 
                 type="button"
                 disabled={pendente}
                 onClick={() => responder(aceitarVinculo, s.id)}
-                className="inline-flex items-center gap-1.5 rounded-sm bg-sheipe px-3 py-1.5 text-xs font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
+                className="tatil inline-flex items-center gap-1.5 rounded-sm bg-sheipe px-3 py-1.5 text-xs font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
               >
                 <Check size={13} strokeWidth={2} /> Aceitar
               </button>

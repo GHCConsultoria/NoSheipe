@@ -39,6 +39,11 @@ const config: Config = {
           deep: "var(--color-sheipe-deep)",
           on: "var(--color-on-sheipe)",
         },
+        // Acento do treino — o par do verde da nutrição.
+        treino: {
+          DEFAULT: "var(--color-treino)",
+          deep: "var(--color-treino-deep)",
+        },
       },
       fontFamily: {
         display: ["var(--font-display)", "ui-monospace", "monospace"],
