@@ -20,7 +20,7 @@ export default function LoginProfissional() {
   const estado = modo === "entrar" ? estadoEntrar : estadoCadastrar;
 
   return (
-    <main className="grid min-h-screen sm:grid-cols-2">
+    <main className="entrada-aba grid min-h-screen sm:grid-cols-2">
       <section
         className="hidden flex-col justify-between p-12 sm:flex"
         style={{ background: "var(--signature-ink)", color: "var(--signature-paper)" }}
@@ -172,7 +172,7 @@ function Botao({ rotulo, rotuloCarregando }: { rotulo: string; rotuloCarregando:
     <button
       type="submit"
       disabled={pending}
-      className="mt-2 rounded-sm bg-sheipe px-4 py-2.5 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
+      className="tatil mt-2 rounded-sm bg-sheipe px-4 py-2.5 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
     >
       {pending ? rotuloCarregando : rotulo}
     </button>

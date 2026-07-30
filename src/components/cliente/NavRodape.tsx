@@ -46,7 +46,7 @@ export function NavRodape({ token, pendentes, mostrarHistorico }: Props) {
               <Link
                 href={href}
                 aria-current={ativa ? "page" : undefined}
-                className={`flex flex-col items-center gap-1 py-2.5 text-[0.6875rem] transition-colors ${
+                className={`tatil flex flex-col items-center gap-1 py-2.5 text-[0.6875rem] ${
                   ativa ? "text-sheipe" : "text-ink-faint hover:text-ink-soft"
                 }`}
               >
