@@ -10,7 +10,9 @@
     "test": "vitest run",
     "postinstall": "prisma generate --schema=prisma/nutri/schema.prisma",
     "db:push:nutri": "node prisma/nutri/aplicar-schema.mjs",
-    "db:seed:nutri": "tsx prisma/nutri/seed.ts"
+    "db:seed:nutri": "tsx prisma/nutri/seed.ts",
+    "test:e2e": "playwright test",
+    "pretest:e2e": "next build"
   },
   "dependencies": {
     "@libsql/client": "^0.8.1",
@@ -25,6 +27,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

@@ -36,3 +36,8 @@ next-env.d.ts
 
 # prisma client gerado
 /prisma/nutri/generated
+
+# banco e artefatos do teste de ponta a ponta (Playwright)
+/.e2e
+/playwright-report
+/test-results

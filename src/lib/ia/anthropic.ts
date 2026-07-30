@@ -21,6 +21,16 @@ interface RespostaAnthropic {
  * decide como comunicar isso ao usuário — nunca inventamos um rascunho.
  */
 export async function gerarTexto({ prompt, maxTokens = 1600 }: GerarTextoParams): Promise<string> {
+  // Resposta fixa pra teste de ponta a ponta, no mesmo espírito do
+  // SEED_POPULACAO_DEMO: opt-in por variável que ninguém define em produção.
+  // Existe porque a IA é o único ponto do fluxo que sai pra rede, e o E2E
+  // precisa exercitar o registro de refeição sem depender da Anthropic nem
+  // gastar tokens. O valor é o texto cru que extrairMacros vai parsear.
+  const respostaFixa = process.env.IA_STUB_JSON;
+  if (respostaFixa) {
+    return respostaFixa;
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new IaNaoConfiguradaError(

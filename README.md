@@ -17,6 +17,22 @@ npm run dev
 
 Abra [http://localhost:3000](http://localhost:3000) — redireciona pra `/nutri/login`.
 
+## Testes
+
+```bash
+npm test        # unidade e integração (vitest) — funções puras e consultas
+                # contra um SQLite de verdade em arquivo temporário
+npm run test:e2e  # ponta a ponta (Playwright) — clica os fluxos de escrita
+                  # num navegador: registrar refeição, cadastrar cliente,
+                  # aceitar vínculo
+```
+
+O e2e é hermético: banco SQLite em arquivo, IA com resposta fixa
+(`IA_STUB_JSON`) e Supabase desligado — o que faz o app cair no "Profissional
+Demo" e deixa o painel navegável sem auth real. Nada sai pra rede, e o
+`pretest:e2e` já faz o build. Usa o Chromium pré-instalado do ambiente (ver
+`playwright.config.ts`); num ambiente novo, `npx playwright install chromium`.
+
 ## Stack
 
 Next.js 14 (App Router) · TypeScript · Prisma · **Turso (libSQL/SQLite)** ·
