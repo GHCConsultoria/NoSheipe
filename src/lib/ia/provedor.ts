@@ -37,11 +37,12 @@ export interface RequisicaoIa {
   body: string;
 }
 
-// Modelos padrão. Gemini e Groq: modelos de tier gratuito, bons o bastante
-// pra devolver o JSON de macros. Anthropic: mantém o que já estava em uso.
+// Modelos padrão. Gemini e Groq: modelos de tier gratuito. Anthropic: Haiku,
+// o mais barato — dá conta do JSON de macros e custa uma fração do Sonnet
+// (troque pra "claude-sonnet-5" via ANTHROPIC_MODEL se a estimativa apertar).
 const MODELO_GEMINI_PADRAO = "gemini-2.0-flash";
 const MODELO_GROQ_PADRAO = "llama-3.3-70b-versatile";
-const MODELO_ANTHROPIC_PADRAO = "claude-sonnet-5";
+const MODELO_ANTHROPIC_PADRAO = "claude-haiku-4-5";
 
 interface EnvIa {
   // Índice pra aceitar process.env direto (todas as chaves são opcionais, o
