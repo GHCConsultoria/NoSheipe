@@ -11,6 +11,31 @@ describe("selecionarProvedor", () => {
     expect(selecionarProvedor({ GROQ_API_KEY: "g", ANTHROPIC_API_KEY: "a" })?.nome).toBe("groq");
   });
 
+  it("usa o provedor genérico quando IA_OPENAI_KEY + IA_OPENAI_BASE_URL existem", () => {
+    const p = selecionarProvedor({
+      IA_OPENAI_KEY: "sk-or",
+      IA_OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
+      IA_OPENAI_MODEL: "meta-llama/llama-3.3-70b-instruct:free",
+    });
+    expect(p?.nome).toBe("compativel");
+    expect(p?.baseUrl).toBe("https://openrouter.ai/api/v1");
+    expect(p?.modelo).toBe("meta-llama/llama-3.3-70b-instruct:free");
+  });
+
+  it("não ativa o genérico com a chave mas sem a URL base", () => {
+    expect(selecionarProvedor({ IA_OPENAI_KEY: "sk-or" })).toBeNull();
+  });
+
+  it("sem preferência, o genérico vem na frente de todos", () => {
+    const p = selecionarProvedor({
+      IA_OPENAI_KEY: "sk-or",
+      IA_OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
+      GITHUB_MODELS_TOKEN: "gh",
+      GEMINI_API_KEY: "gm",
+    });
+    expect(p?.nome).toBe("compativel");
+  });
+
   it("usa GitHub Models quando só o token dele existe", () => {
     const p = selecionarProvedor({ GITHUB_MODELS_TOKEN: "gh" });
     expect(p?.nome).toBe("github");
@@ -75,6 +100,21 @@ describe("montarRequisicao", () => {
     const corpo = JSON.parse(req.body);
     expect(corpo.model).toBe("llama-x");
     expect(corpo.max_tokens).toBe(800);
+    expect(corpo.messages).toEqual([{ role: "user", content: "oi" }]);
+  });
+
+  it("compativel: monta a URL a partir do baseUrl, normalizando a barra final", () => {
+    const provedor: Provedor = {
+      nome: "compativel",
+      apiKey: "sk-or",
+      modelo: "meta-llama/llama-3.3-70b-instruct:free",
+      baseUrl: "https://openrouter.ai/api/v1/",
+    };
+    const req = montarRequisicao(provedor, "oi", 800);
+    expect(req.url).toBe("https://openrouter.ai/api/v1/chat/completions");
+    expect(req.headers.authorization).toBe("Bearer sk-or");
+    const corpo = JSON.parse(req.body);
+    expect(corpo.model).toBe("meta-llama/llama-3.3-70b-instruct:free");
     expect(corpo.messages).toEqual([{ role: "user", content: "oi" }]);
   });
 
