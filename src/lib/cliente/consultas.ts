@@ -61,6 +61,7 @@ export interface BlocoNutricao {
     gordura: number;
     confianca: number;
     macrosPendentes: boolean;
+    ajustadoManualmente: boolean;
     horario: string;
   }[];
   favoritos: { id: string; descricao: string }[];
@@ -137,6 +138,7 @@ async function montarBlocoNutricao(clienteId: string, inicioHoje: Date, fimHoje:
       gordura: r.gordura,
       confianca: r.confianca,
       macrosPendentes: r.macrosPendentes,
+      ajustadoManualmente: r.ajustadoManualmente,
       horario: FORMATADOR_HORA.format(r.registradoEm),
     })),
     favoritos: favoritos.map((f) => ({ id: f.id, descricao: f.descricao })),

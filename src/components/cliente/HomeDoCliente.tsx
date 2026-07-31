@@ -8,6 +8,7 @@ import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/compo
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
 import {
+  ajustarRefeicao,
   estimarRefeicao,
   registrarPeso,
   registrarTreino,
@@ -40,6 +41,7 @@ interface Props {
       gordura: number;
       confianca: number;
       macrosPendentes: boolean;
+      ajustadoManualmente: boolean;
       horario: string;
     }[];
     favoritos: { id: string; descricao: string }[];
@@ -158,6 +160,34 @@ function BlocoRefeicao({
   const [pendente, iniciarTransicao] = useTransition();
   const [falaDisponivel, setFalaDisponivel] = useState(false);
   const { gravando, erro: erroFala, iniciar, parar } = useReconhecimentoDeFala();
+
+  // Ajuste manual dos macros: qual refeição está em edição e o rascunho dos
+  // campos (string, porque vêm de <input>).
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState({ kcal: "", proteina: "", carbo: "", gordura: "" });
+
+  function abrirEdicao(r: (typeof registros)[number]) {
+    setErro(null);
+    setEditandoId(r.id);
+    setRascunho({
+      kcal: String(r.kcal),
+      proteina: String(r.proteina),
+      carbo: String(r.carbo),
+      gordura: String(r.gordura),
+    });
+  }
+
+  function salvarAjuste(registroId: string) {
+    iniciarTransicao(async () => {
+      const resultado = await ajustarRefeicao({ token, registroId, ...rascunho });
+      if (!resultado.sucesso) {
+        setErro(resultado.erro);
+        return;
+      }
+      setEditandoId(null);
+      router.refresh();
+    });
+  }
 
   useEffect(() => setFalaDisponivel(reconhecimentoDeFalaDisponivel()), []);
 
@@ -313,7 +343,52 @@ function BlocoRefeicao({
                   </button>
                 </div>
               </div>
-              {r.macrosPendentes ? (
+              {editandoId === r.id ? (
+                <div className="mt-2 flex flex-col gap-2">
+                  <div className="grid grid-cols-4 gap-2">
+                    {(
+                      [
+                        ["kcal", "kcal"],
+                        ["proteina", "P (g)"],
+                        ["carbo", "C (g)"],
+                        ["gordura", "G (g)"],
+                      ] as const
+                    ).map(([campo, rotulo]) => (
+                      <label key={campo} className="flex flex-col gap-0.5 text-[0.65rem] text-ink-faint">
+                        {rotulo}
+                        <input
+                          type="number"
+                          min={0}
+                          inputMode="numeric"
+                          value={rascunho[campo]}
+                          onChange={(e) => setRascunho((prev) => ({ ...prev, [campo]: e.target.value }))}
+                          className="w-full rounded-sm border border-rule bg-paper px-2 py-1 text-sm outline-none focus:border-sheipe"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={pendente}
+                      onClick={() => salvarAjuste(r.id)}
+                      className="tatil rounded-sm bg-sheipe px-3 py-1 text-xs font-medium text-sheipe-on transition-colors hover:bg-sheipe-deep disabled:opacity-50"
+                    >
+                      Salvar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditandoId(null);
+                        setErro(null);
+                      }}
+                      className="tatil rounded-sm border border-rule px-3 py-1 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : r.macrosPendentes ? (
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-xs text-attention">macros a estimar — a IA estava indisponível</span>
                   <button
@@ -330,12 +405,32 @@ function BlocoRefeicao({
                   >
                     Estimar agora
                   </button>
+                  <button
+                    type="button"
+                    disabled={pendente}
+                    onClick={() => abrirEdicao(r)}
+                    className="tatil rounded-sm border border-rule px-2 py-0.5 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink disabled:opacity-50"
+                  >
+                    Ajustar na mão
+                  </button>
                 </div>
               ) : (
-                <p className="mt-1 text-xs text-ink-faint">
-                  {r.kcal} kcal · {r.proteina}g P · {r.carbo}g C · {r.gordura}g G ·{" "}
-                  <span className="text-attention">estimativa ({Math.round(r.confianca * 100)}%)</span>
-                </p>
+                <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <p className="text-xs text-ink-faint">
+                    {r.kcal} kcal · {r.proteina}g P · {r.carbo}g C · {r.gordura}g G ·{" "}
+                    <span className="text-attention">
+                      {r.ajustadoManualmente ? "ajustado por você" : `estimativa (${Math.round(r.confianca * 100)}%)`}
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    disabled={pendente}
+                    onClick={() => abrirEdicao(r)}
+                    className="tatil text-xs text-ink-faint underline underline-offset-2 transition-colors hover:text-sheipe disabled:opacity-50"
+                  >
+                    ajustar
+                  </button>
+                </div>
               )}
             </li>
           ))}

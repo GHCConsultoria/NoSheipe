@@ -6,6 +6,7 @@ import { extrairMacros, IaRespostaInvalidaError } from "@/lib/nutri/ia";
 import {
   StatusCliente,
   StatusVinculo,
+  ajustarMacrosSchema,
   favoritoSchema,
   registrarPesoSchema,
   registrarSchema,
@@ -251,6 +252,45 @@ export async function estimarRefeicao(input: unknown): Promise<ResultadoAcaoPubl
       carbo: Math.round(macros.totals.carbs),
       gordura: Math.round(macros.totals.fat),
       confianca: macros.confidence,
+      macrosPendentes: false,
+    },
+  });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Ajuste manual dos macros de uma refeição. A IA propõe, a pessoa corrige: os
+ * números passam a ser dela (ajustadoManualmente), e a refeição deixa de estar
+ * "a estimar" se estava — corrigir na mão é uma forma de resolver a pendência.
+ * O filtro por clienteId impede editar a refeição de outra pessoa sabendo o id.
+ */
+export async function ajustarRefeicao(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = ajustarMacrosSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "valores inválidos" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const refeicao = await prismaNutri.refeicao.findFirst({
+    where: { id: parsed.data.registroId, clienteId: cliente.id },
+  });
+  if (!refeicao) return { sucesso: false, erro: "registro não encontrado" };
+
+  await prismaNutri.refeicao.update({
+    where: { id: refeicao.id },
+    data: {
+      kcal: parsed.data.kcal,
+      proteina: parsed.data.proteina,
+      carbo: parsed.data.carbo,
+      gordura: parsed.data.gordura,
+      // Número confirmado pela pessoa: confiança total, não é mais estimativa
+      // nem pendência.
+      confianca: 1,
+      ajustadoManualmente: true,
       macrosPendentes: false,
     },
   });

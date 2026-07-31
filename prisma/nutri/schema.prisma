@@ -221,6 +221,11 @@ model Refeicao {
   // re-tentar — nunca chuta um número. Some quando a estimativa entra.
   macrosPendentes Boolean @default(false)
 
+  // A pessoa corrigiu os macros na mão (a IA estimou perto, mas não exato).
+  // A UI mostra "ajustado por você" em vez de "estimativa X%" — o número é
+  // dela, não da IA. "O sistema propõe, o humano confirma."
+  ajustadoManualmente Boolean @default(false)
+
   registradoEm DateTime @default(now())
 
   // Nunca exclusão física: uma refeição registrada errada (a IA estimou

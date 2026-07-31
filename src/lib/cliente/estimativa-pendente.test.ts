@@ -40,6 +40,7 @@ type ModuloConsultas = typeof import("./consultas");
 type ModuloPrisma = typeof import("@/lib/nutri/prisma");
 
 let estimarRefeicao: ModuloPublico["estimarRefeicao"];
+let ajustarRefeicao: ModuloPublico["ajustarRefeicao"];
 let buscarPainelDoCliente: ModuloConsultas["buscarPainelDoCliente"];
 let prismaNutri: ModuloPrisma["prismaNutri"];
 
@@ -61,7 +62,7 @@ beforeAll(async () => {
   }
   bruto.close();
 
-  ({ estimarRefeicao } = await import("./publico"));
+  ({ estimarRefeicao, ajustarRefeicao } = await import("./publico"));
   ({ buscarPainelDoCliente } = await import("./consultas"));
   ({ prismaNutri } = await import("@/lib/nutri/prisma"));
 
@@ -165,5 +166,52 @@ describe("refeição a estimar", () => {
     // Segunda chamada: já não está pendente, devolve sucesso sem tocar a IA.
     delete process.env.IA_STUB_JSON;
     expect((await estimarRefeicao({ token: TOKEN, registroId: alvo })).sucesso).toBe(true);
+  });
+});
+
+describe("ajustar macros na mão", () => {
+  it("grava os valores, marca ajustadoManualmente e tira a pendência", async () => {
+    const alvo = await registrarPendente();
+
+    const resultado = await ajustarRefeicao({
+      token: TOKEN,
+      registroId: alvo,
+      kcal: 420,
+      proteina: 30,
+      carbo: 40,
+      gordura: 12,
+    });
+    expect(resultado.sucesso).toBe(true);
+
+    const atualizada = await prismaNutri.refeicao.findUniqueOrThrow({ where: { id: alvo } });
+    expect(atualizada.kcal).toBe(420);
+    expect(atualizada.proteina).toBe(30);
+    expect(atualizada.ajustadoManualmente).toBe(true);
+    expect(atualizada.macrosPendentes).toBe(false);
+    expect(atualizada.confianca).toBe(1);
+    expect(await saldoKcal()).toBe(420);
+  });
+
+  it("recusa valor negativo sem tocar na refeição", async () => {
+    const alvo = await registrarPendente();
+    const resultado = await ajustarRefeicao({ token: TOKEN, registroId: alvo, kcal: -5, proteina: 0, carbo: 0, gordura: 0 });
+
+    expect(resultado.sucesso).toBe(false);
+    const crua = await prismaNutri.refeicao.findUniqueOrThrow({ where: { id: alvo } });
+    expect(crua.ajustadoManualmente).toBe(false);
+    expect(crua.kcal).toBe(0);
+  });
+
+  it("o token de outro cliente não ajusta refeição alheia", async () => {
+    const alvo = await registrarPendente();
+    const resultado = await ajustarRefeicao({
+      token: TOKEN_OUTRO,
+      registroId: alvo,
+      kcal: 999,
+      proteina: 0,
+      carbo: 0,
+      gordura: 0,
+    });
+    expect(resultado).toEqual({ sucesso: false, erro: "registro não encontrado" });
   });
 });
