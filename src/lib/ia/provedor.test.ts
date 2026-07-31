@@ -11,6 +11,22 @@ describe("selecionarProvedor", () => {
     expect(selecionarProvedor({ GROQ_API_KEY: "g", ANTHROPIC_API_KEY: "a" })?.nome).toBe("groq");
   });
 
+  it("usa GitHub Models quando só o token dele existe", () => {
+    const p = selecionarProvedor({ GITHUB_MODELS_TOKEN: "gh" });
+    expect(p?.nome).toBe("github");
+    expect(p?.modelo).toMatch(/gpt-4o-mini/);
+  });
+
+  it("sem preferência, GitHub Models vem na frente dos outros gratuitos", () => {
+    const p = selecionarProvedor({ GITHUB_MODELS_TOKEN: "gh", GEMINI_API_KEY: "gm", GROQ_API_KEY: "g" });
+    expect(p?.nome).toBe("github");
+  });
+
+  it("respeita IA_PROVEDOR=github, ignorando uma chave Gemini presente", () => {
+    const p = selecionarProvedor({ IA_PROVEDOR: "github", GITHUB_MODELS_TOKEN: "gh", GEMINI_API_KEY: "gm" });
+    expect(p?.nome).toBe("github");
+  });
+
   it("usa Anthropic quando só a chave dele existe", () => {
     const p = selecionarProvedor({ ANTHROPIC_API_KEY: "a" });
     expect(p?.nome).toBe("anthropic");
@@ -62,6 +78,17 @@ describe("montarRequisicao", () => {
     expect(corpo.messages).toEqual([{ role: "user", content: "oi" }]);
   });
 
+  it("GitHub Models: dialeto OpenAI, Bearer e models.github.ai", () => {
+    const provedor: Provedor = { nome: "github", apiKey: "tok-gh", modelo: "openai/gpt-4o-mini" };
+    const req = montarRequisicao(provedor, "oi", 800);
+    expect(req.url).toContain("models.github.ai");
+    expect(req.url).toContain("chat/completions");
+    expect(req.headers.authorization).toBe("Bearer tok-gh");
+    const corpo = JSON.parse(req.body);
+    expect(corpo.model).toBe("openai/gpt-4o-mini");
+    expect(corpo.messages).toEqual([{ role: "user", content: "oi" }]);
+  });
+
   it("Anthropic: x-api-key, versão e /v1/messages", () => {
     const provedor: Provedor = { nome: "anthropic", apiKey: "chave-a", modelo: "claude-x" };
     const req = montarRequisicao(provedor, "oi", 800);
@@ -75,6 +102,7 @@ describe("montarRequisicao", () => {
 describe("extrairTexto", () => {
   const gemini: Provedor = { nome: "gemini", apiKey: "gm", modelo: "m" };
   const groq: Provedor = { nome: "groq", apiKey: "g", modelo: "m" };
+  const github: Provedor = { nome: "github", apiKey: "gh", modelo: "m" };
   const anthropic: Provedor = { nome: "anthropic", apiKey: "a", modelo: "m" };
 
   it("Gemini: junta os parts do primeiro candidate", () => {
@@ -84,6 +112,10 @@ describe("extrairTexto", () => {
 
   it("Groq: pega choices[0].message.content", () => {
     expect(extrairTexto(groq, { choices: [{ message: { content: "resposta" } }] })).toBe("resposta");
+  });
+
+  it("GitHub Models: mesmo formato OpenAI, choices[0].message.content", () => {
+    expect(extrairTexto(github, { choices: [{ message: { content: "resposta" } }] })).toBe("resposta");
   });
 
   it("Anthropic: pega o primeiro bloco de texto", () => {
