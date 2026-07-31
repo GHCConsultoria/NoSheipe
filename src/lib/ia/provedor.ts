@@ -1,15 +1,18 @@
 /**
- * Provedor de IA pra estimar macros. Suporta GitHub Models (GPT-4o-mini de
- * graça, autenticando com um token do GitHub), Gemini e Groq (tiers
- * gratuitos) e Anthropic (pago, de reserva). A chamada é um fetch simples,
- * sem SDK: cada provedor expõe uma API de chat por HTTP e o formato de cada um
- * mora nas funções puras abaixo (montarRequisicao/extrairTexto), fáceis de
- * testar sem rede.
+ * Provedor de IA pra estimar macros. Suporta um provedor genérico
+ * "compativel" (qualquer endpoint no dialeto OpenAI — OpenRouter, Cerebras,
+ * etc. — configurado só por env var), além de Gemini, Groq, GitHub Models e
+ * Anthropic. A chamada é um fetch simples, sem SDK: cada provedor expõe uma
+ * API de chat por HTTP e o formato de cada um mora nas funções puras abaixo
+ * (montarRequisicao/extrairTexto), fáceis de testar sem rede.
  *
- * Trocar de provedor é só uma variável de ambiente: sem nenhuma chave,
- * gerarTexto lança IaNaoConfiguradaError; quando o provedor responde erro
- * (sem crédito, limite, fora do ar), lança IaIndisponivelError — quem chama
- * traduz os dois em mensagem tratada, nunca inventa um rascunho.
+ * Trocar de provedor é só variável de ambiente — de propósito, porque os
+ * tiers gratuitos vivem mudando (cota zerada, signup fora do ar, serviço
+ * aposentado). O "compativel" existe justamente pra isso: aponta o
+ * IA_OPENAI_BASE_URL pra outro provedor e segue, sem tocar no código. Sem
+ * nenhuma chave, gerarTexto lança IaNaoConfiguradaError; quando o provedor
+ * responde erro (sem crédito, limite, fora do ar), lança IaIndisponivelError
+ * — quem chama traduz os dois em mensagem tratada, nunca inventa um rascunho.
  */
 
 /** Nenhuma chave de provedor configurada. */
@@ -18,12 +21,14 @@ export class IaNaoConfiguradaError extends Error {}
 /** O provedor existe mas recusou/falhou agora (crédito, limite, rede, 5xx). */
 export class IaIndisponivelError extends Error {}
 
-export type NomeProvedor = "github" | "gemini" | "groq" | "anthropic";
+export type NomeProvedor = "compativel" | "github" | "gemini" | "groq" | "anthropic";
 
 export interface Provedor {
   nome: NomeProvedor;
   apiKey: string;
   modelo: string;
+  // Só o "compativel" usa: a URL base do endpoint OpenAI-compatible.
+  baseUrl?: string;
 }
 
 export interface GerarTextoParams {
@@ -52,6 +57,10 @@ interface EnvIa {
   // que sem isto dispara a checagem de "weak type" do TS).
   [chave: string]: string | undefined;
   IA_PROVEDOR?: string;
+  // Provedor genérico OpenAI-compatible (OpenRouter, Cerebras, etc.).
+  IA_OPENAI_BASE_URL?: string;
+  IA_OPENAI_KEY?: string;
+  IA_OPENAI_MODEL?: string;
   GITHUB_MODELS_TOKEN?: string;
   GITHUB_MODELS_MODEL?: string;
   GEMINI_API_KEY?: string;
@@ -64,14 +73,19 @@ interface EnvIa {
 
 /**
  * Escolhe o provedor a partir das variáveis de ambiente. Sem preferência
- * explícita (IA_PROVEDOR), os gratuitos vêm primeiro — GitHub Models (grátis,
- * sem cartão) na frente, depois Gemini e Groq; Anthropic entra só como
- * reserva. Devolve null quando nenhuma chave existe — aí quem chama lança
+ * explícita (IA_PROVEDOR), o provedor genérico "compativel" (IA_OPENAI_*) vem
+ * na frente — é por onde se aponta pra qualquer endpoint OpenAI-compatible
+ * gratuito do momento; depois GitHub Models, Gemini e Groq; Anthropic entra só
+ * como reserva. Devolve null quando nenhuma chave existe — aí quem chama lança
  * IaNaoConfiguradaError.
  */
 export function selecionarProvedor(env: EnvIa): Provedor | null {
   const preferido = env.IA_PROVEDOR?.trim().toLowerCase();
 
+  const compativel: Provedor | null =
+    env.IA_OPENAI_KEY && env.IA_OPENAI_BASE_URL
+      ? { nome: "compativel", apiKey: env.IA_OPENAI_KEY, modelo: env.IA_OPENAI_MODEL || "", baseUrl: env.IA_OPENAI_BASE_URL }
+      : null;
   const github: Provedor | null = env.GITHUB_MODELS_TOKEN
     ? { nome: "github", apiKey: env.GITHUB_MODELS_TOKEN, modelo: env.GITHUB_MODELS_MODEL || MODELO_GITHUB_PADRAO }
     : null;
@@ -85,12 +99,13 @@ export function selecionarProvedor(env: EnvIa): Provedor | null {
     ? { nome: "anthropic", apiKey: env.ANTHROPIC_API_KEY, modelo: env.ANTHROPIC_MODEL || MODELO_ANTHROPIC_PADRAO }
     : null;
 
+  if (preferido === "compativel" && compativel) return compativel;
   if (preferido === "github" && github) return github;
   if (preferido === "gemini" && gemini) return gemini;
   if (preferido === "groq" && groq) return groq;
   if (preferido === "anthropic" && anthropic) return anthropic;
 
-  return github ?? gemini ?? groq ?? anthropic;
+  return compativel ?? github ?? gemini ?? groq ?? anthropic;
 }
 
 /** Monta URL, headers e corpo no formato do provedor escolhido. */
@@ -114,14 +129,17 @@ export function montarRequisicao(provedor: Provedor, prompt: string, maxTokens: 
     };
   }
 
-  if (provedor.nome === "groq" || provedor.nome === "github") {
-    // Groq e GitHub Models falam o mesmo dialeto OpenAI (chat/completions);
-    // muda só a URL base e o Bearer. GitHub Models autentica com um token do
-    // GitHub (permissão models:read) e serve modelos da OpenAI de graça.
+  if (provedor.nome === "groq" || provedor.nome === "github" || provedor.nome === "compativel") {
+    // Todos falam o mesmo dialeto OpenAI (chat/completions) — muda só a URL
+    // base e o Bearer. O "compativel" monta a URL a partir do baseUrl
+    // configurado (ex.: OpenRouter, Cerebras), normalizando a barra final.
+    const base = (provedor.baseUrl ?? "").replace(/\/+$/, "");
     const url =
       provedor.nome === "groq"
         ? "https://api.groq.com/openai/v1/chat/completions"
-        : "https://models.github.ai/inference/chat/completions";
+        : provedor.nome === "github"
+          ? "https://models.github.ai/inference/chat/completions"
+          : `${base}/chat/completions`;
     return {
       url,
       headers: {
@@ -146,7 +164,7 @@ export function montarRequisicao(provedor: Provedor, prompt: string, maxTokens: 
 interface RespostaGemini {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
 }
-// Formato OpenAI de chat — serve Groq e GitHub Models.
+// Formato OpenAI de chat — serve Groq, GitHub Models e o genérico "compativel".
 interface RespostaChatOpenAi {
   choices?: Array<{ message?: { content?: string } }>;
 }
@@ -164,7 +182,7 @@ export function extrairTexto(provedor: Provedor, dados: unknown): string | null 
     const texto = partes.map((parte) => parte.text ?? "").join("").trim();
     return texto || null;
   }
-  if (provedor.nome === "groq" || provedor.nome === "github") {
+  if (provedor.nome === "groq" || provedor.nome === "github" || provedor.nome === "compativel") {
     const openai = dados as RespostaChatOpenAi;
     return openai.choices?.[0]?.message?.content ?? null;
   }
@@ -186,7 +204,7 @@ export async function gerarTexto({ prompt, maxTokens = 1600 }: GerarTextoParams)
   const provedor = selecionarProvedor(process.env);
   if (!provedor) {
     throw new IaNaoConfiguradaError(
-      "nenhum provedor de IA configurado — defina GITHUB_MODELS_TOKEN (grátis) ou ANTHROPIC_API_KEY",
+      "nenhum provedor de IA configurado — defina IA_OPENAI_BASE_URL + IA_OPENAI_KEY (ex.: OpenRouter, grátis) ou ANTHROPIC_API_KEY",
     );
   }
 
