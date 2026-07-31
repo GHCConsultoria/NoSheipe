@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { buscarClientePorToken, buscarPainelDoCliente } from "@/lib/cliente/consultas";
 import { MeusProfissionais, SolicitacoesPendentes } from "@/components/cliente/MeusProfissionais";
+import { MeusDadosLGPD } from "@/components/cliente/MeusDadosLGPD";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { ThemeToggle } from "@/components/nutri/ThemeToggle";
 
@@ -45,6 +46,8 @@ export default async function PerfilDoCliente({ params }: { params: { token: str
           <ThemeToggle inline />
         </div>
       </section>
+
+      <MeusDadosLGPD token={cliente.tokenAcesso} />
     </main>
   );
 }

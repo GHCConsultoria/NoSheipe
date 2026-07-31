@@ -318,6 +318,63 @@ export async function removerSessaoTreino(input: unknown): Promise<ResultadoAcao
   return { sucesso: true };
 }
 
+/**
+ * Exclusão LGPD dos próprios dados, por anonimização: some o que liga os
+ * registros a uma pessoa identificável (nome, telefone, anamnese, texto livre
+ * das refeições/treinos) e encerra os acompanhamentos. Os números
+ * de-identificados (macros, peso) e o registro clínico do profissional
+ * (Anotacao) ficam — é decisão de política que o dono do app revê com o
+ * jurídico. status ARQUIVADO mata o link na hora: clientePeloToken e
+ * buscarClientePorToken já recusam quem não está ATIVO.
+ */
+export async function apagarMeusDados(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = tokenSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "token inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.$transaction([
+    prismaNutri.cliente.update({
+      where: { id: cliente.id },
+      data: {
+        nome: "Cliente removido",
+        telefone: null,
+        dataNascimento: null,
+        sexo: null,
+        alturaCm: null,
+        objetivo: null,
+        status: StatusCliente.ARQUIVADO,
+      },
+    }),
+    prismaNutri.anamneseNutricional.updateMany({
+      where: { clienteId: cliente.id },
+      data: { restricoesAlimentares: null, observacoes: null },
+    }),
+    prismaNutri.anamneseTreino.updateMany({
+      where: { clienteId: cliente.id },
+      data: { lesoesLimitacoes: null, praticaOutroEsporte: null, observacoes: null },
+    }),
+    prismaNutri.refeicao.updateMany({
+      where: { clienteId: cliente.id },
+      data: { entradaBruta: "[removido]", itens: "[]" },
+    }),
+    prismaNutri.sessaoTreino.updateMany({
+      where: { clienteId: cliente.id },
+      data: { entradaBruta: "[removido]" },
+    }),
+    prismaNutri.favorito.deleteMany({ where: { clienteId: cliente.id } }),
+    prismaNutri.vinculo.updateMany({
+      where: { clienteId: cliente.id, status: { not: StatusVinculo.ENCERRADO } },
+      data: { status: StatusVinculo.ENCERRADO },
+    }),
+  ]);
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  revalidatePath("/pro");
+  return { sucesso: true };
+}
+
 export async function salvarFavorito(input: unknown): Promise<ResultadoAcaoPublica> {
   const parsed = favoritoSchema.safeParse(input);
   if (!parsed.success) {
