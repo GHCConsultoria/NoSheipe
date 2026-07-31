@@ -159,6 +159,19 @@ export const removerRegistroSchema = tokenSchema.extend({
   registroId: z.string().min(1),
 });
 
+/**
+ * Ajuste manual dos macros de uma refeição — quando a IA estimou perto mas
+ * não exato, ou quando a pessoa prefere digitar o valor da embalagem. Inteiros
+ * não-negativos; um teto plausível evita erro grosseiro de digitação.
+ */
+export const ajustarMacrosSchema = tokenSchema.extend({
+  registroId: z.string().min(1),
+  kcal: z.coerce.number().int().nonnegative("kcal não pode ser negativo").max(20000, "kcal fora do plausível"),
+  proteina: z.coerce.number().int().nonnegative("proteína não pode ser negativa").max(2000, "valor fora do plausível"),
+  carbo: z.coerce.number().int().nonnegative("carboidrato não pode ser negativo").max(2000, "valor fora do plausível"),
+  gordura: z.coerce.number().int().nonnegative("gordura não pode ser negativa").max(2000, "valor fora do plausível"),
+});
+
 /** Mesmo alfabeto de gerarCodigoConvite — sem 0/O e 1/I. */
 const ALFABETO_CONVITE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 

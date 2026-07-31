@@ -375,3 +375,8 @@ ALTER TABLE "sessoes_treino" ADD COLUMN "removidoEm" DATETIME;
 -- cota, sem chave): a refeição entra com macro zerado e esta flag ligada,
 -- pra estimar depois. Idempotente do mesmo jeito que os ALTERs acima.
 ALTER TABLE "refeicoes" ADD COLUMN "macrosPendentes" BOOLEAN NOT NULL DEFAULT false;
+
+-- AlterTable
+-- A pessoa pode corrigir os macros na mão; esta flag rotula "ajustado por
+-- você" em vez de "estimativa". Idempotente como os ALTERs acima.
+ALTER TABLE "refeicoes" ADD COLUMN "ajustadoManualmente" BOOLEAN NOT NULL DEFAULT false;
