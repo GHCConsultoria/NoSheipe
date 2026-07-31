@@ -8,6 +8,7 @@ import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/compo
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
 import {
+  estimarRefeicao,
   registrarPeso,
   registrarTreino,
   removerFavorito,
@@ -38,6 +39,7 @@ interface Props {
       carbo: number;
       gordura: number;
       confianca: number;
+      macrosPendentes: boolean;
       horario: string;
     }[];
     favoritos: { id: string; descricao: string }[];
@@ -311,10 +313,30 @@ function BlocoRefeicao({
                   </button>
                 </div>
               </div>
-              <p className="mt-1 text-xs text-ink-faint">
-                {r.kcal} kcal · {r.proteina}g P · {r.carbo}g C · {r.gordura}g G ·{" "}
-                <span className="text-attention">estimativa ({Math.round(r.confianca * 100)}%)</span>
-              </p>
+              {r.macrosPendentes ? (
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-xs text-attention">macros a estimar — a IA estava indisponível</span>
+                  <button
+                    type="button"
+                    disabled={pendente}
+                    onClick={() =>
+                      iniciarTransicao(async () => {
+                        const resultado = await estimarRefeicao({ token, registroId: r.id });
+                        if (!resultado.sucesso) setErro(resultado.erro);
+                        router.refresh();
+                      })
+                    }
+                    className="tatil rounded-sm border border-rule px-2 py-0.5 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink disabled:opacity-50"
+                  >
+                    Estimar agora
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-1 text-xs text-ink-faint">
+                  {r.kcal} kcal · {r.proteina}g P · {r.carbo}g C · {r.gordura}g G ·{" "}
+                  <span className="text-attention">estimativa ({Math.round(r.confianca * 100)}%)</span>
+                </p>
+              )}
             </li>
           ))}
         </ul>

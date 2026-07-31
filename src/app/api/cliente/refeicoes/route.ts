@@ -13,6 +13,7 @@ function serializar(registro: {
   carbo: number;
   gordura: number;
   confianca: number;
+  macrosPendentes: boolean;
   registradoEm: Date;
 }) {
   return {
@@ -24,6 +25,7 @@ function serializar(registro: {
     carbo: registro.carbo,
     gordura: registro.gordura,
     confianca: registro.confianca,
+    macrosPendentes: registro.macrosPendentes,
     registradoEm: registro.registradoEm.toISOString(),
   };
 }
@@ -61,9 +63,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ sucesso: true, registro: serializar(existente) });
   }
 
-  let macros;
+  // Os macros: da IA quando ela responde; zerados e marcados "a estimar"
+  // quando o provedor está fora. O registro nunca trava por causa da IA.
+  let dadosMacro: {
+    itens: string;
+    kcal: number;
+    proteina: number;
+    carbo: number;
+    gordura: number;
+    confianca: number;
+    macrosPendentes: boolean;
+  };
   try {
-    macros = await extrairMacros(parsed.data.rawText);
+    const macros = await extrairMacros(parsed.data.rawText);
+    dadosMacro = {
+      itens: JSON.stringify(macros.items),
+      kcal: Math.round(macros.totals.kcal),
+      proteina: Math.round(macros.totals.protein),
+      carbo: Math.round(macros.totals.carbs),
+      gordura: Math.round(macros.totals.fat),
+      confianca: macros.confidence,
+      macrosPendentes: false,
+    };
   } catch (erro) {
     if (erro instanceof IaRespostaInvalidaError) {
       // A IA respondeu, mas não num formato aproveitável pra ESTA descrição —
@@ -72,15 +93,13 @@ export async function POST(request: NextRequest) {
     }
     if (erro instanceof IaIndisponivelError || erro instanceof IaNaoConfiguradaError) {
       // Pane do provedor (sem crédito, limite, fora do ar) ou chave ausente:
-      // o detalhe vai pro log do servidor; pra pessoa, uma mensagem clara e
-      // sem jargão, em vez do "falha ao registrar" genérico de um 500.
-      console.error("[refeicoes] estimativa de macros indisponível:", erro.message);
-      return NextResponse.json(
-        { erro: "a estimativa automática está indisponível no momento — tente de novo em instantes" },
-        { status: 503 },
-      );
+      // não trava o registro. Salva com o texto e macros a estimar depois —
+      // nunca inventa número. O detalhe vai pro log do servidor.
+      console.error("[refeicoes] estimativa indisponível, registrando p/ estimar depois:", erro.message);
+      dadosMacro = { itens: "[]", kcal: 0, proteina: 0, carbo: 0, gordura: 0, confianca: 0, macrosPendentes: true };
+    } else {
+      throw erro;
     }
-    throw erro;
   }
 
   try {
@@ -90,12 +109,7 @@ export async function POST(request: NextRequest) {
         clienteRegistroId: parsed.data.clientLogId,
         origem: parsed.data.origem,
         entradaBruta: parsed.data.rawText,
-        itens: JSON.stringify(macros.items),
-        kcal: Math.round(macros.totals.kcal),
-        proteina: Math.round(macros.totals.protein),
-        carbo: Math.round(macros.totals.carbs),
-        gordura: Math.round(macros.totals.fat),
-        confianca: macros.confidence,
+        ...dadosMacro,
       },
     });
     return NextResponse.json({ sucesso: true, registro: serializar(registro) });

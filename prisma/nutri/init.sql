@@ -369,3 +369,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS "anamnese_treino_clienteId_key" ON "anamnese_t
 -- tolera o "duplicate column name" da segunda passada, então isto é idempotente.
 ALTER TABLE "refeicoes" ADD COLUMN "removidoEm" DATETIME;
 ALTER TABLE "sessoes_treino" ADD COLUMN "removidoEm" DATETIME;
+
+-- AlterTable
+-- Registro de refeição não pode travar quando a IA de macros está fora (sem
+-- cota, sem chave): a refeição entra com macro zerado e esta flag ligada,
+-- pra estimar depois. Idempotente do mesmo jeito que os ALTERs acima.
+ALTER TABLE "refeicoes" ADD COLUMN "macrosPendentes" BOOLEAN NOT NULL DEFAULT false;

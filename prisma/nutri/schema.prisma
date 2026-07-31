@@ -215,6 +215,12 @@ model Refeicao {
   // 0..1 devolvido pela IA — estimativa, nunca fato; rotulado na UI.
   confianca Float
 
+  // Registro não fica refém da IA: quando o provedor de macros está fora
+  // (sem cota, sem chave, fora do ar), a refeição é salva mesmo assim com os
+  // macros zerados e esta flag ligada. A UI mostra "a estimar" e oferece
+  // re-tentar — nunca chuta um número. Some quando a estimativa entra.
+  macrosPendentes Boolean @default(false)
+
   registradoEm DateTime @default(now())
 
   // Nunca exclusão física: uma refeição registrada errada (a IA estimou
