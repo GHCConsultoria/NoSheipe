@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prismaNutri } from "@/lib/nutri/prisma";
+import { extrairMacros, IaRespostaInvalidaError } from "@/lib/nutri/ia";
 import {
   StatusCliente,
   StatusVinculo,
@@ -208,6 +209,51 @@ export async function removerRefeicao(input: unknown): Promise<ResultadoAcaoPubl
   if (!refeicao) return { sucesso: false, erro: "registro não encontrado" };
 
   await prismaNutri.refeicao.update({ where: { id: refeicao.id }, data: { removidoEm: new Date() } });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Estima os macros de uma refeição que entrou "a estimar" — registrada
+ * enquanto a IA estava fora do ar. Chama a IA de novo com o mesmo texto; se
+ * agora responde, preenche os macros e tira a flag. Se ainda está fora,
+ * devolve erro e a refeição continua pendente (nunca inventa número).
+ */
+export async function estimarRefeicao(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = removerRegistroSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const refeicao = await prismaNutri.refeicao.findFirst({
+    where: { id: parsed.data.registroId, clienteId: cliente.id },
+  });
+  if (!refeicao) return { sucesso: false, erro: "registro não encontrado" };
+  // Já estimada (ou estimada em paralelo): nada a fazer, e não gasta a IA à toa.
+  if (!refeicao.macrosPendentes) return { sucesso: true };
+
+  let macros;
+  try {
+    macros = await extrairMacros(refeicao.entradaBruta);
+  } catch (erro) {
+    if (erro instanceof IaRespostaInvalidaError) return { sucesso: false, erro: erro.message };
+    return { sucesso: false, erro: "a estimativa automática ainda está indisponível — tente de novo em instantes" };
+  }
+
+  await prismaNutri.refeicao.update({
+    where: { id: refeicao.id },
+    data: {
+      itens: JSON.stringify(macros.items),
+      kcal: Math.round(macros.totals.kcal),
+      proteina: Math.round(macros.totals.protein),
+      carbo: Math.round(macros.totals.carbs),
+      gordura: Math.round(macros.totals.fat),
+      confianca: macros.confidence,
+      macrosPendentes: false,
+    },
+  });
 
   revalidatePath(`/p/${parsed.data.token}`);
   return { sucesso: true };
