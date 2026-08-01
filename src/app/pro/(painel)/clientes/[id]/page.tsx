@@ -103,6 +103,8 @@ export default async function FichaCliente({ params }: { params: { id: string } 
             valor: p.pesoKg,
             rotulo: FORMATADOR_DIA.format(p.registradoEm),
           }))}
+          templatesNutricao={ficha.templatesNutricao}
+          templatesTreino={ficha.templatesTreino}
         />
       </div>
     </main>

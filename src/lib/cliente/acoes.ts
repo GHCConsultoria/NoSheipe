@@ -14,7 +14,10 @@ import {
   clienteIdSchema,
   criarClienteSchema,
   recadoSchema,
+  removerTemplateSchema,
   solicitarVinculoSchema,
+  templateNutricaoSchema,
+  templateTreinoSchema,
 } from "@/lib/cliente/schemas";
 
 export type ResultadoAcao = { sucesso: true } | { sucesso: false; erro: string };
@@ -228,6 +231,73 @@ export async function atualizarMetas(input: unknown): Promise<ResultadoAcao> {
 
   revalidatePath(`/pro/clientes/${cliente.id}`);
   revalidatePath("/pro");
+  return { sucesso: true };
+}
+
+/**
+ * Salva as metas atuais como um template reusável do profissional. Exige a
+ * capacidade de nutrição — só quem prescreve dieta guarda template de dieta.
+ */
+export async function salvarTemplateNutricao(input: unknown): Promise<ResultadoAcao> {
+  const parsed = templateNutricaoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+
+  const profissional = await exigirCapacidade(Capacidade.NUTRICAO);
+  await prismaNutri.template.create({
+    data: {
+      profissionalId: profissional.id,
+      tipo: TipoVinculo.NUTRICAO,
+      nome: parsed.data.nome,
+      metaKcal: parsed.data.metas.metaKcal,
+      metaProteina: parsed.data.metas.metaProteina,
+      metaCarbo: parsed.data.metas.metaCarbo,
+      metaGordura: parsed.data.metas.metaGordura,
+    },
+  });
+
+  revalidatePath("/pro", "layout");
+  return { sucesso: true };
+}
+
+/** Salva o treino atual como template reusável do profissional. */
+export async function salvarTemplateTreino(input: unknown): Promise<ResultadoAcao> {
+  const parsed = templateTreinoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+
+  const profissional = await exigirCapacidade(Capacidade.TREINO);
+  await prismaNutri.template.create({
+    data: {
+      profissionalId: profissional.id,
+      tipo: TipoVinculo.TREINO,
+      nome: parsed.data.nome,
+      descricao: parsed.data.treino.descricao,
+      diasPorSemana: parsed.data.treino.diasPorSemana,
+    },
+  });
+
+  revalidatePath("/pro", "layout");
+  return { sucesso: true };
+}
+
+/**
+ * Remove um template. Só toca nos do próprio profissional — o filtro por
+ * profissionalId impede apagar template alheio sabendo o id. Template é
+ * conveniência, não registro de negócio: aqui DELETE é de verdade.
+ */
+export async function removerTemplate(input: unknown): Promise<ResultadoAcao> {
+  const parsed = removerTemplateSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const profissional = await obterProfissionalAtual();
+  await prismaNutri.template.deleteMany({
+    where: { id: parsed.data.templateId, profissionalId: profissional.id },
+  });
+
+  revalidatePath("/pro", "layout");
   return { sucesso: true };
 }
 

@@ -130,6 +130,8 @@ export interface FichaDoCliente {
   anotacoes: { id: string; texto: string; criadoEm: Date }[];
   recados: { id: string; texto: string; criadoEm: Date; lido: boolean }[];
   pesos: { pesoKg: number; registradoEm: Date }[];
+  templatesNutricao: { id: string; nome: string; metaKcal: number; metaProteina: number; metaCarbo: number; metaGordura: number }[];
+  templatesTreino: { id: string; nome: string; descricao: string; diasPorSemana: number }[];
 }
 
 /**
@@ -149,7 +151,8 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
   const acompanhaNutricao = vinculos.some((v) => v.tipo === TipoVinculo.NUTRICAO);
   const acompanhaTreino = vinculos.some((v) => v.tipo === TipoVinculo.TREINO);
 
-  const [plano, treino, anamneseNutricional, anamneseTreino, anotacoes, recados, pesos] = await Promise.all([
+  const [plano, treino, anamneseNutricional, anamneseTreino, anotacoes, recados, pesos, templatesNutricao, templatesTreino] =
+    await Promise.all([
     acompanhaNutricao
       ? prismaNutri.planoNutricional.findFirst({ where: { clienteId, ativo: true }, orderBy: { criadoEm: "desc" } })
       : null,
@@ -166,6 +169,19 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
     prismaNutri.recado.findMany({ where: { clienteId, profissionalId }, orderBy: { criadoEm: "desc" }, take: 20 }),
     // Peso é medida objetiva e serve aos dois lados.
     prismaNutri.medida.findMany({ where: { clienteId }, orderBy: { registradoEm: "asc" }, take: 60 }),
+    // Templates do profissional — só do lado que ele acompanha neste cliente.
+    acompanhaNutricao
+      ? prismaNutri.template.findMany({
+          where: { profissionalId, tipo: TipoVinculo.NUTRICAO },
+          orderBy: { criadoEm: "desc" },
+        })
+      : [],
+    acompanhaTreino
+      ? prismaNutri.template.findMany({
+          where: { profissionalId, tipo: TipoVinculo.TREINO },
+          orderBy: { criadoEm: "desc" },
+        })
+      : [],
   ]);
 
   return {
@@ -186,6 +202,20 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
     anotacoes: anotacoes.map((a) => ({ id: a.id, texto: a.texto, criadoEm: a.criadoEm })),
     recados: recados.map((r) => ({ id: r.id, texto: r.texto, criadoEm: r.criadoEm, lido: r.lidoEm !== null })),
     pesos: pesos.map((p) => ({ pesoKg: p.pesoKg, registradoEm: p.registradoEm })),
+    templatesNutricao: templatesNutricao.map((t) => ({
+      id: t.id,
+      nome: t.nome,
+      metaKcal: t.metaKcal ?? 0,
+      metaProteina: t.metaProteina ?? 0,
+      metaCarbo: t.metaCarbo ?? 0,
+      metaGordura: t.metaGordura ?? 0,
+    })),
+    templatesTreino: templatesTreino.map((t) => ({
+      id: t.id,
+      nome: t.nome,
+      descricao: t.descricao ?? "",
+      diasPorSemana: t.diasPorSemana ?? 3,
+    })),
   };
 }
 

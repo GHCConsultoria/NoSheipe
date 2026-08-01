@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { X } from "lucide-react";
 import {
   adicionarAnotacao,
   arquivarCliente,
@@ -9,6 +10,9 @@ import {
   atualizarTreino,
   enviarRecado,
   regenerarToken,
+  removerTemplate,
+  salvarTemplateNutricao,
+  salvarTemplateTreino,
 } from "@/lib/cliente/acoes";
 import { GraficoLinha } from "@/components/shared/GraficoLinha";
 
@@ -23,6 +27,8 @@ interface Props {
   anotacoes: { id: string; texto: string; criadoEm: string }[];
   recados: { id: string; texto: string; criadoEm: string; lido: boolean }[];
   pesos: { valor: number; rotulo: string }[];
+  templatesNutricao: { id: string; nome: string; metaKcal: number; metaProteina: number; metaCarbo: number; metaGordura: number }[];
+  templatesTreino: { id: string; nome: string; descricao: string; diasPorSemana: number }[];
 }
 
 export function EditorCliente({
@@ -36,6 +42,8 @@ export function EditorCliente({
   anotacoes,
   recados,
   pesos,
+  templatesNutricao,
+  templatesTreino,
 }: Props) {
   const router = useRouter();
   const [pendente, iniciarTransicao] = useTransition();
@@ -138,6 +146,28 @@ export function EditorCliente({
           className="paper-card grid grid-cols-1 gap-4 rounded-sm p-6 sm:grid-cols-2"
         >
           <h2 className="eyebrow sm:col-span-2">Metas diárias</h2>
+          <div className="sm:col-span-2">
+            <TemplatesBar
+              templates={templatesNutricao.map((t) => ({ id: t.id, nome: t.nome }))}
+              aoAplicar={(id) => {
+                const t = templatesNutricao.find((x) => x.id === id);
+                if (t)
+                  setMetas({
+                    metaKcal: String(t.metaKcal),
+                    metaProteina: String(t.metaProteina),
+                    metaCarbo: String(t.metaCarbo),
+                    metaGordura: String(t.metaGordura),
+                  });
+              }}
+              aoSalvar={() => {
+                const nome = window.prompt("Nome do template de dieta:");
+                if (!nome?.trim()) return;
+                executar(() => salvarTemplateNutricao({ nome, metas }), "Template salvo.");
+              }}
+              aoRemover={(id) => executar(() => removerTemplate({ templateId: id }), "Template removido.")}
+              pendente={pendente}
+            />
+          </div>
           <Campo rotulo="Meta kcal" valor={metas.metaKcal} aoMudar={(v) => setMetas((m) => ({ ...m, metaKcal: v }))} />
           <Campo
             rotulo="Proteína (g)"
@@ -171,6 +201,20 @@ export function EditorCliente({
           className="paper-card flex flex-col gap-4 rounded-sm p-6"
         >
           <h2 className="eyebrow">Treino prescrito</h2>
+          <TemplatesBar
+            templates={templatesTreino.map((t) => ({ id: t.id, nome: t.nome }))}
+            aoAplicar={(id) => {
+              const t = templatesTreino.find((x) => x.id === id);
+              if (t) setTreino((atual) => ({ ...atual, descricao: t.descricao, diasPorSemana: String(t.diasPorSemana) }));
+            }}
+            aoSalvar={() => {
+              const nome = window.prompt("Nome do template de treino:");
+              if (!nome?.trim()) return;
+              executar(() => salvarTemplateTreino({ nome, treino }), "Template salvo.");
+            }}
+            aoRemover={(id) => executar(() => removerTemplate({ templateId: id }), "Template removido.")}
+            pendente={pendente}
+          />
           <label className="text-sm">
             <span className="eyebrow mb-1.5 block">Nome</span>
             <input
@@ -303,6 +347,58 @@ export function EditorCliente({
         className="self-start text-sm text-ink-faint transition-colors hover:text-urgent disabled:opacity-50"
       >
         Encerrar acompanhamento
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Barra de templates de um formulário: aplicar (preenche os campos, não
+ * salva — a prescrição de verdade continua sendo o Salvar do form) e
+ * guardar os valores atuais como template novo. Cada chip aplica ao clicar
+ * e some com o "x".
+ */
+function TemplatesBar({
+  templates,
+  aoAplicar,
+  aoSalvar,
+  aoRemover,
+  pendente,
+}: {
+  templates: { id: string; nome: string }[];
+  aoAplicar: (id: string) => void;
+  aoSalvar: () => void;
+  aoRemover: (id: string) => void;
+  pendente: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {templates.map((t) => (
+        <span
+          key={t.id}
+          className="inline-flex items-center gap-1 rounded-full border border-rule px-2.5 py-1 text-xs text-ink-soft"
+        >
+          <button type="button" onClick={() => aoAplicar(t.id)} className="hover:text-sheipe" disabled={pendente}>
+            {t.nome}
+          </button>
+          <button
+            type="button"
+            aria-label={`Remover template ${t.nome}`}
+            onClick={() => aoRemover(t.id)}
+            disabled={pendente}
+            className="text-ink-faint hover:text-urgent"
+          >
+            <X size={12} />
+          </button>
+        </span>
+      ))}
+      <button
+        type="button"
+        onClick={aoSalvar}
+        disabled={pendente}
+        className="rounded-full border border-dashed border-rule px-2.5 py-1 text-xs text-ink-faint transition-colors hover:border-sheipe hover:text-sheipe disabled:opacity-50"
+      >
+        + salvar como template
       </button>
     </div>
   );

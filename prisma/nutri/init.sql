@@ -426,3 +426,28 @@ CREATE TABLE IF NOT EXISTS "recados" (
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "recados_clienteId_idx" ON "recados"("clienteId");
+
+
+-- ============================================================
+-- Templates: dieta/treino "de prateleira" do profissional, pra
+-- reusar em vários clientes. Aplicar só preenche o formulário.
+-- ============================================================
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "templates" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "profissionalId" TEXT NOT NULL,
+    "tipo" TEXT NOT NULL,
+    "nome" TEXT NOT NULL,
+    "metaKcal" INTEGER,
+    "metaProteina" INTEGER,
+    "metaCarbo" INTEGER,
+    "metaGordura" INTEGER,
+    "descricao" TEXT,
+    "diasPorSemana" INTEGER,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "templates_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "profissionais" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "templates_profissionalId_tipo_idx" ON "templates"("profissionalId", "tipo");

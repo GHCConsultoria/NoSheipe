@@ -139,6 +139,16 @@ export const recadoSchema = clienteIdSchema.extend({
   texto: z.string().trim().min(1, "escreva o recado").max(1000, "recado longo demais"),
 });
 
+const nomeTemplate = z.string().trim().min(1, "dê um nome ao template").max(80, "nome longo demais");
+
+/** Template de metas nutricionais — reaproveita a validação de metas. */
+export const templateNutricaoSchema = z.object({ nome: nomeTemplate, metas: metasSchema });
+
+/** Template de treino — reaproveita a validação de treino. */
+export const templateTreinoSchema = z.object({ nome: nomeTemplate, treino: treinoSchema });
+
+export const removerTemplateSchema = z.object({ templateId: z.string().min(1) });
+
 export const tokenSchema = z.object({ token: z.string().min(1) });
 
 export const registrarPesoSchema = tokenSchema.extend({
