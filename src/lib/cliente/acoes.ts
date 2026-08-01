@@ -4,6 +4,13 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prismaNutri } from "@/lib/nutri/prisma";
 import { Capacidade, exigirCapacidade, obterProfissionalAtual } from "@/lib/profissional/auth";
+import { buscarComparacaoSemanas } from "@/lib/profissional/consultas";
+import {
+  gerarRelatorioEvolucao,
+  IaNaoConfiguradaError,
+  IaIndisponivelError,
+  type DadosRelatorio,
+} from "@/lib/profissional/relatorio";
 import {
   StatusCliente,
   StatusVinculo,
@@ -22,6 +29,7 @@ import {
 
 export type ResultadoAcao = { sucesso: true } | { sucesso: false; erro: string };
 export type ResultadoToken = { sucesso: true; token: string } | { sucesso: false; erro: string };
+export type ResultadoRelatorio = { sucesso: true; texto: string } | { sucesso: false; erro: string };
 /** Devolve o nome pra quem pediu confirmar que digitou o código certo. */
 export type ResultadoSolicitacao = { sucesso: true; nome: string } | { sucesso: false; erro: string };
 
@@ -436,4 +444,59 @@ export async function enviarRecado(input: unknown): Promise<ResultadoAcao> {
   revalidatePath(`/pro/clientes/${parsed.data.clienteId}`);
   if (cliente) revalidatePath(`/p/${cliente.tokenAcesso}`);
   return { sucesso: true };
+}
+
+/**
+ * Resumo de evolução gerado por IA a partir dos números do cliente (peso e
+ * comparativo de semanas). Não persiste nada: é uma ajuda de redação pro
+ * profissional, que lê e decide. Só usa os lados que ele acompanha, e a IA
+ * é instruída a não inventar — se a IA está fora, devolve erro tratado.
+ */
+export async function gerarRelatorio(input: unknown): Promise<ResultadoRelatorio> {
+  const parsed = clienteIdSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const profissional = await obterProfissionalAtual();
+  const vinculos = await prismaNutri.vinculo.findMany({
+    where: { clienteId: parsed.data.clienteId, profissionalId: profissional.id, status: StatusVinculo.ATIVO },
+  });
+  if (vinculos.length === 0) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const acompanhaNutricao = vinculos.some((v) => v.tipo === TipoVinculo.NUTRICAO);
+  const acompanhaTreino = vinculos.some((v) => v.tipo === TipoVinculo.TREINO);
+
+  const cliente = await prismaNutri.cliente.findUnique({ where: { id: parsed.data.clienteId } });
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const [medidas, comparacao] = await Promise.all([
+    prismaNutri.medida.findMany({ where: { clienteId: cliente.id }, orderBy: { registradoEm: "asc" } }),
+    buscarComparacaoSemanas(cliente.id, acompanhaNutricao, acompanhaTreino),
+  ]);
+
+  const peso =
+    medidas.length >= 2
+      ? {
+          primeiro: medidas[0].pesoKg,
+          ultimo: medidas[medidas.length - 1].pesoKg,
+          dias: Math.max(
+            1,
+            Math.round((medidas[medidas.length - 1].registradoEm.getTime() - medidas[0].registradoEm.getTime()) / 86_400_000),
+          ),
+        }
+      : null;
+
+  const dados: DadosRelatorio = { nome: cliente.nome, objetivo: cliente.objetivo, peso, comparacao };
+
+  try {
+    const texto = await gerarRelatorioEvolucao(dados);
+    return { sucesso: true, texto };
+  } catch (erro) {
+    if (erro instanceof IaNaoConfiguradaError) {
+      return { sucesso: false, erro: "a IA de relatório não está configurada — configure a chave nas variáveis de ambiente" };
+    }
+    if (erro instanceof IaIndisponivelError) {
+      return { sucesso: false, erro: "a IA está indisponível agora — tente de novo em instantes" };
+    }
+    return { sucesso: false, erro: "não deu pra gerar o relatório agora" };
+  }
 }

@@ -9,6 +9,7 @@ import {
   atualizarMetas,
   atualizarTreino,
   enviarRecado,
+  gerarRelatorio,
   regenerarToken,
   removerTemplate,
   salvarTemplateNutricao,
@@ -65,6 +66,7 @@ export function EditorCliente({
   });
   const [novaAnotacao, setNovaAnotacao] = useState("");
   const [novoRecado, setNovoRecado] = useState("");
+  const [relatorio, setRelatorio] = useState<string | null>(null);
 
   useEffect(() => {
     setOrigem(window.location.origin);
@@ -258,6 +260,48 @@ export function EditorCliente({
           <GraficoLinha pontos={pesos} sufixo=" kg" />
         </section>
       )}
+
+      <section className="paper-card flex flex-col gap-3 rounded-sm p-6">
+        <h2 className="eyebrow">Relatório de evolução (IA)</h2>
+        <p className="-mt-2 text-xs text-ink-faint">
+          Resumo automático a partir do peso e do comparativo de semanas. Você revisa antes de usar — a IA não inventa
+          dado.
+        </p>
+        <div>
+          <button
+            type="button"
+            disabled={pendente}
+            onClick={() => {
+              setErro(null);
+              setSalvo(null);
+              setRelatorio(null);
+              iniciarTransicao(async () => {
+                const r = await gerarRelatorio({ clienteId });
+                if (!r.sucesso) {
+                  setErro(r.erro);
+                  return;
+                }
+                setRelatorio(r.texto);
+              });
+            }}
+            className="rounded-sm border border-rule px-3 py-2 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink disabled:opacity-50"
+          >
+            {pendente ? "Gerando…" : "Gerar relatório"}
+          </button>
+        </div>
+        {relatorio && (
+          <div className="rounded-sm border border-rule bg-paper p-3">
+            <p className="text-sm whitespace-pre-wrap">{relatorio}</p>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(relatorio)}
+              className="mt-2 text-xs text-ink-faint underline underline-offset-2 transition-colors hover:text-sheipe"
+            >
+              Copiar
+            </button>
+          </div>
+        )}
+      </section>
 
       <section className="paper-card flex flex-col gap-4 rounded-sm p-6">
         <h2 className="eyebrow">Recado pro cliente</h2>
