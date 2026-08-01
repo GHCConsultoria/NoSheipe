@@ -240,3 +240,14 @@ export const solicitarVinculoSchema = z.object({
 export const vinculoDoClienteSchema = tokenSchema.extend({
   vinculoId: z.string().min(1),
 });
+
+/** Inscrição de Web Push de um aparelho — o que o PushManager do navegador devolve. */
+export const inscricaoPushSchema = tokenSchema.extend({
+  endpoint: z.string().url("endpoint inválido"),
+  p256dh: z.string().min(1),
+  auth: z.string().min(1),
+});
+
+export const removerInscricaoPushSchema = tokenSchema.extend({
+  endpoint: z.string().url("endpoint inválido"),
+});

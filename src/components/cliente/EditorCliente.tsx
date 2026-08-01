@@ -8,6 +8,7 @@ import {
   arquivarCliente,
   atualizarMetas,
   atualizarTreino,
+  cutucarCliente,
   enviarRecado,
   gerarRelatorio,
   regenerarToken,
@@ -313,7 +314,7 @@ export function EditorCliente({
           placeholder="Ex.: caprichou essa semana, bora manter!"
           className="w-full rounded-sm border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-sheipe"
         />
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             disabled={pendente || !novoRecado.trim()}
@@ -327,6 +328,15 @@ export function EditorCliente({
             className="tatil rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
           >
             Enviar recado
+          </button>
+          <button
+            type="button"
+            disabled={pendente}
+            onClick={() => executar(() => cutucarCliente({ clienteId }), "Cutucada enviada.")}
+            className="rounded-sm border border-rule px-3 py-2 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink disabled:opacity-50"
+            title="Envia um lembrete push pro aparelho do cliente, sem texto"
+          >
+            Cutucar (lembrete push)
           </button>
         </div>
         {recados.length > 0 && (

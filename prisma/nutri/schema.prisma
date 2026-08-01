@@ -117,6 +117,7 @@ model Cliente {
   registrosAgua       RegistroAgua[]
   anotacoes           Anotacao[]
   recados             Recado[]
+  inscricoesPush      PushSubscription[]
   favoritos           Favorito[]
   anamneseNutricional AnamneseNutricional?
   anamneseTreino      AnamneseTreino?
@@ -364,6 +365,27 @@ model Template {
 
   @@index([profissionalId, tipo])
   @@map("templates")
+}
+
+/// Inscrição de Web Push de UM aparelho do cliente (o mesmo cliente pode ter
+/// vários: celular, tablet). endpoint é a chave natural que o navegador dá;
+/// p256dh/auth são as chaves de cifragem da mensagem. Não é dado de negócio
+/// — expira sozinho e é recriado, então some de verdade quando o navegador
+/// avisa que morreu (404/410).
+model PushSubscription {
+  id String @id @default(cuid())
+
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  clienteId String
+
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  criadoEm DateTime @default(now())
+
+  @@index([clienteId])
+  @@map("push_subscriptions")
 }
 
 /// Atalho de conveniência do cliente — não é registro de negócio, então

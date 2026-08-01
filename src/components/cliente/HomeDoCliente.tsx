@@ -21,6 +21,7 @@ import {
   salvarFavorito,
 } from "@/lib/cliente/publico";
 import { AnelDeProgresso, type Arco } from "@/components/shared/AnelDeProgresso";
+import { GerenciarPush } from "@/components/cliente/GerenciarPush";
 
 interface SaldoMacro {
   consumido: number;
@@ -82,6 +83,8 @@ interface Props {
   hidratacao: { consumidoMl: number; metaMl: number; percentual: number; copoMl: number };
   ofensiva: { dias: number; ativaHoje: boolean };
   recados: { id: string; texto: string; profissionalNome: string; quando: string; lido: boolean }[];
+  /** Chave pública VAPID pro opt-in de lembretes; null se o push não está configurado. */
+  chavePush: string | null;
 }
 
 /**
@@ -101,6 +104,7 @@ export function HomeDoCliente({
   hidratacao,
   ofensiva,
   recados,
+  chavePush,
 }: Props) {
   const semAcompanhamento = !nutricao && !treino;
 
@@ -146,6 +150,8 @@ export function HomeDoCliente({
           )}
 
           <BlocoAgua token={token} hidratacao={hidratacao} />
+
+          <GerenciarPush token={token} chavePublica={chavePush} />
 
           {nutricao && <BlocoRefeicao token={token} favoritos={nutricao.favoritos} registros={nutricao.registrosHoje} />}
           {nutricao && (

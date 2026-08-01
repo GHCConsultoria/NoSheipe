@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prismaNutri } from "@/lib/nutri/prisma";
 import { Capacidade, exigirCapacidade, obterProfissionalAtual } from "@/lib/profissional/auth";
 import { buscarComparacaoSemanas } from "@/lib/profissional/consultas";
+import { pushConfigurado, enviarPush } from "@/lib/push/webpush";
 import {
   gerarRelatorioEvolucao,
   IaNaoConfiguradaError,
@@ -443,6 +444,55 @@ export async function enviarRecado(input: unknown): Promise<ResultadoAcao> {
 
   revalidatePath(`/pro/clientes/${parsed.data.clienteId}`);
   if (cliente) revalidatePath(`/p/${cliente.tokenAcesso}`);
+  return { sucesso: true };
+}
+
+/**
+ * "Cutucar": manda um lembrete push pro cliente sumido. Exige vínculo ativo.
+ * Envia pra todos os aparelhos dele e limpa as inscrições que o navegador
+ * reportar mortas. Degrada com mensagem clara quando o push não está
+ * configurado (faltam chaves VAPID) ou quando o cliente não ativou lembretes.
+ */
+export async function cutucarCliente(input: unknown): Promise<ResultadoAcao> {
+  const parsed = clienteIdSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const profissional = await obterProfissionalAtual();
+  const vinculo = await prismaNutri.vinculo.findFirst({
+    where: { clienteId: parsed.data.clienteId, profissionalId: profissional.id, status: StatusVinculo.ATIVO },
+  });
+  if (!vinculo) return { sucesso: false, erro: "cliente não encontrado" };
+
+  if (!pushConfigurado()) {
+    return { sucesso: false, erro: "lembretes push não configurados no servidor (faltam as chaves VAPID)" };
+  }
+
+  const cliente = await prismaNutri.cliente.findUnique({ where: { id: parsed.data.clienteId } });
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const inscricoes = await prismaNutri.pushSubscription.findMany({ where: { clienteId: cliente.id } });
+  if (inscricoes.length === 0) {
+    return { sucesso: false, erro: "esse cliente ainda não ativou os lembretes no aparelho dele" };
+  }
+
+  const payload = {
+    titulo: "Lembrete do seu profissional",
+    corpo: `${profissional.nome} passou pra lembrar: que tal registrar hoje?`,
+    url: `/p/${cliente.tokenAcesso}`,
+  };
+
+  const resultados = await Promise.all(inscricoes.map((i) => enviarPush(i, payload)));
+
+  // Limpa as que morreram (aparelho desinstalou o PWA) — não é dado de negócio.
+  const expiradas = inscricoes.filter((_, idx) => resultados[idx] === "expirado").map((i) => i.id);
+  if (expiradas.length > 0) {
+    await prismaNutri.pushSubscription.deleteMany({ where: { id: { in: expiradas } } });
+  }
+
+  if (!resultados.includes("ok")) {
+    return { sucesso: false, erro: "não consegui entregar o lembrete agora — tente de novo em instantes" };
+  }
+
   return { sucesso: true };
 }
 

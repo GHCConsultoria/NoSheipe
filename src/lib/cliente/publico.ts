@@ -9,10 +9,12 @@ import {
   ajustarMacrosSchema,
   definirMetaAguaSchema,
   favoritoSchema,
+  inscricaoPushSchema,
   registrarAguaSchema,
   registrarPesoSchema,
   registrarSchema,
   removerFavoritoSchema,
+  removerInscricaoPushSchema,
   removerRegistroSchema,
   tokenSchema,
   vinculoDoClienteSchema,
@@ -485,6 +487,52 @@ export async function salvarFavorito(input: unknown): Promise<ResultadoAcaoPubli
   }
 
   revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Registra a inscrição de Web Push de um aparelho do cliente. Chave natural
+ * é o endpoint (o navegador dá um por aparelho): upsert por ele evita
+ * duplicar quando o mesmo aparelho reinscreve, e reaponta pro cliente certo
+ * caso o aparelho troque de dono.
+ */
+export async function salvarInscricaoPush(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = inscricaoPushSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "inscrição inválida" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.pushSubscription.upsert({
+    where: { endpoint: parsed.data.endpoint },
+    update: { clienteId: cliente.id, p256dh: parsed.data.p256dh, auth: parsed.data.auth },
+    create: {
+      clienteId: cliente.id,
+      endpoint: parsed.data.endpoint,
+      p256dh: parsed.data.p256dh,
+      auth: parsed.data.auth,
+    },
+  });
+
+  return { sucesso: true };
+}
+
+/** Desliga os lembretes neste aparelho — apaga a inscrição pelo endpoint. */
+export async function removerInscricaoPush(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = removerInscricaoPushSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  // Filtro por clienteId: saber o endpoint de outra pessoa não basta pra
+  // apagar a inscrição dela.
+  await prismaNutri.pushSubscription.deleteMany({
+    where: { endpoint: parsed.data.endpoint, clienteId: cliente.id },
+  });
+
   return { sucesso: true };
 }
 

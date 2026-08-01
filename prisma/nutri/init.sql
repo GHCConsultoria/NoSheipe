@@ -451,3 +451,25 @@ CREATE TABLE IF NOT EXISTS "templates" (
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "templates_profissionalId_tipo_idx" ON "templates"("profissionalId", "tipo");
+
+
+-- ============================================================
+-- Web Push: uma inscrição por aparelho do cliente. VAPID nas envs.
+-- ============================================================
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "push_subscriptions" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "endpoint" TEXT NOT NULL,
+    "p256dh" TEXT NOT NULL,
+    "auth" TEXT NOT NULL,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "push_subscriptions_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "push_subscriptions_endpoint_key" ON "push_subscriptions"("endpoint");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "push_subscriptions_clienteId_idx" ON "push_subscriptions"("clienteId");
