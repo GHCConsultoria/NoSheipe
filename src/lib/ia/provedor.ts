@@ -31,9 +31,18 @@ export interface Provedor {
   baseUrl?: string;
 }
 
+/** Imagem pra estimativa por visão — base64 cru, sem o prefixo data:. */
+export interface ImagemIa {
+  base64: string;
+  /** "image/jpeg" | "image/png" | "image/webp" */
+  mediaType: string;
+}
+
 export interface GerarTextoParams {
   prompt: string;
   maxTokens?: number;
+  /** Quando presente, a requisição vira multimodal (foto da refeição). */
+  imagem?: ImagemIa;
 }
 
 export interface RequisicaoIa {
@@ -109,13 +118,20 @@ export function selecionarProvedor(env: EnvIa): Provedor | null {
 }
 
 /** Monta URL, headers e corpo no formato do provedor escolhido. */
-export function montarRequisicao(provedor: Provedor, prompt: string, maxTokens: number): RequisicaoIa {
-  const mensagens = [{ role: "user", content: prompt }];
-
+export function montarRequisicao(
+  provedor: Provedor,
+  prompt: string,
+  maxTokens: number,
+  imagem?: ImagemIa,
+): RequisicaoIa {
   if (provedor.nome === "gemini") {
     // Gemini (Generative Language API). A chave vai no header x-goog-api-key,
     // não na URL, pra não vazar em log de requisição. responseMimeType força
-    // JSON puro, o que casa com o que extrairMacros espera.
+    // JSON puro, o que casa com o que extrairMacros espera. Com foto, a
+    // parte inline_data entra antes do texto.
+    const parts = imagem
+      ? [{ inline_data: { mime_type: imagem.mediaType, data: imagem.base64 } }, { text: prompt }]
+      : [{ text: prompt }];
     return {
       url: `https://generativelanguage.googleapis.com/v1beta/models/${provedor.modelo}:generateContent`,
       headers: {
@@ -123,7 +139,7 @@ export function montarRequisicao(provedor: Provedor, prompt: string, maxTokens: 
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ parts }],
         generationConfig: { maxOutputTokens: maxTokens, responseMimeType: "application/json" },
       }),
     };
@@ -140,16 +156,31 @@ export function montarRequisicao(provedor: Provedor, prompt: string, maxTokens: 
         : provedor.nome === "github"
           ? "https://models.github.ai/inference/chat/completions"
           : `${base}/chat/completions`;
+    // Sem imagem, content é string (formato antigo). Com imagem, vira o array
+    // multimodal do dialeto OpenAI, com a foto como data URL.
+    const content = imagem
+      ? [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: `data:${imagem.mediaType};base64,${imagem.base64}` } },
+        ]
+      : prompt;
     return {
       url,
       headers: {
         authorization: `Bearer ${provedor.apiKey}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ model: provedor.modelo, max_tokens: maxTokens, messages: mensagens }),
+      body: JSON.stringify({ model: provedor.modelo, max_tokens: maxTokens, messages: [{ role: "user", content }] }),
     };
   }
 
+  // Anthropic Messages. Com foto, o bloco image (base64) vem antes do texto.
+  const content = imagem
+    ? [
+        { type: "image", source: { type: "base64", media_type: imagem.mediaType, data: imagem.base64 } },
+        { type: "text", text: prompt },
+      ]
+    : prompt;
   return {
     url: "https://api.anthropic.com/v1/messages",
     headers: {
@@ -157,7 +188,7 @@ export function montarRequisicao(provedor: Provedor, prompt: string, maxTokens: 
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
-    body: JSON.stringify({ model: provedor.modelo, max_tokens: maxTokens, messages: mensagens }),
+    body: JSON.stringify({ model: provedor.modelo, max_tokens: maxTokens, messages: [{ role: "user", content }] }),
   };
 }
 
@@ -190,7 +221,7 @@ export function extrairTexto(provedor: Provedor, dados: unknown): string | null 
   return anthropic.content?.find((bloco) => bloco.type === "text")?.text ?? null;
 }
 
-export async function gerarTexto({ prompt, maxTokens = 1600 }: GerarTextoParams): Promise<string> {
+export async function gerarTexto({ prompt, maxTokens = 1600, imagem }: GerarTextoParams): Promise<string> {
   // Resposta fixa pra teste de ponta a ponta, no mesmo espírito do
   // SEED_POPULACAO_DEMO: opt-in por variável que ninguém define em produção.
   // Existe porque a IA é o único ponto do fluxo que sai pra rede, e o E2E
@@ -208,7 +239,7 @@ export async function gerarTexto({ prompt, maxTokens = 1600 }: GerarTextoParams)
     );
   }
 
-  const requisicao = montarRequisicao(provedor, prompt, maxTokens);
+  const requisicao = montarRequisicao(provedor, prompt, maxTokens, imagem);
 
   let resposta: Response;
   try {

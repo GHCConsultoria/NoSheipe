@@ -27,6 +27,7 @@ export type StatusVinculo = (typeof StatusVinculo)[keyof typeof StatusVinculo];
 export const OrigemRegistro = {
   AUDIO: "AUDIO",
   TEXTO: "TEXTO",
+  FOTO: "FOTO",
 } as const;
 export type OrigemRegistro = (typeof OrigemRegistro)[keyof typeof OrigemRegistro];
 
@@ -177,6 +178,19 @@ export const registrarSchema = tokenSchema.extend({
   clientLogId: z.string().uuid("clientLogId deve ser um UUID"),
   rawText: z.string().trim().min(1, "descreva o que aconteceu"),
   origem: z.nativeEnum(OrigemRegistro).default(OrigemRegistro.TEXTO),
+});
+
+/**
+ * Registro de refeição por FOTO. A imagem vai em base64 (sem o prefixo
+ * data:) e o mediaType diz o formato. Teto de ~9 MB de base64 (~6,5 MB de
+ * imagem) evita corpo gigante — o cliente reduz antes de enviar.
+ */
+export const registrarFotoSchema = tokenSchema.extend({
+  clientLogId: z.string().uuid("clientLogId deve ser um UUID"),
+  imagemBase64: z.string().min(1, "imagem vazia").max(9_000_000, "imagem grande demais — tente uma menor"),
+  mediaType: z.enum(["image/jpeg", "image/png", "image/webp"], {
+    message: "formato de imagem não suportado",
+  }),
 });
 
 export const favoritoSchema = tokenSchema.extend({

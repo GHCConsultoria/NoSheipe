@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
-import { Droplet, Flame, MessageCircle, Mic, Plus, Square, Undo2, X } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Camera, Droplet, Flame, MessageCircle, Mic, Plus, Square, Undo2, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
@@ -26,6 +26,29 @@ interface SaldoMacro {
   consumido: number;
   meta: number;
   percentual: number;
+}
+
+/**
+ * Reduz a foto no próprio celular antes de subir: redimensiona pro maior
+ * lado caber em 1024px e re-encoda em JPEG. Economiza banda e mantém o
+ * corpo bem abaixo do teto do servidor — a foto de câmera vem com vários MB.
+ */
+async function fotoParaBase64(file: File): Promise<{ base64: string; mediaType: "image/jpeg" }> {
+  const bitmap = await createImageBitmap(file);
+  const escala = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
+  const largura = Math.round(bitmap.width * escala);
+  const altura = Math.round(bitmap.height * escala);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = largura;
+  canvas.height = altura;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("sem canvas");
+  ctx.drawImage(bitmap, 0, 0, largura, altura);
+
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+  const base64 = dataUrl.split(",")[1] ?? "";
+  return { base64, mediaType: "image/jpeg" };
 }
 
 interface Props {
@@ -183,6 +206,32 @@ function BlocoRefeicao({
   const [pendente, iniciarTransicao] = useTransition();
   const [falaDisponivel, setFalaDisponivel] = useState(false);
   const { gravando, erro: erroFala, iniciar, parar } = useReconhecimentoDeFala();
+  const fotoInputRef = useRef<HTMLInputElement>(null);
+
+  function registrarPorFoto(file: File) {
+    setErro(null);
+    const clientLogId = crypto.randomUUID();
+    iniciarTransicao(async () => {
+      let img: { base64: string; mediaType: string };
+      try {
+        img = await fotoParaBase64(file);
+      } catch {
+        setErro("não consegui ler essa imagem — tente outra");
+        return;
+      }
+      const resposta = await fetch("/api/cliente/refeicoes/foto", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token, clientLogId, imagemBase64: img.base64, mediaType: img.mediaType }),
+      });
+      const dados = await resposta.json().catch(() => ({}));
+      if (!resposta.ok) {
+        setErro(dados.erro ?? "falha ao registrar a foto — tente de novo");
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   // Ajuste manual dos macros: qual refeição está em edição e o rascunho dos
   // campos (string, porque vêm de <input>).
@@ -282,6 +331,27 @@ function BlocoRefeicao({
         />
 
         <div className="flex flex-wrap gap-2">
+          <input
+            ref={fotoInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              // Zera o value pra permitir reescolher a mesma foto depois.
+              e.target.value = "";
+              if (file) registrarPorFoto(file);
+            }}
+          />
+          <button
+            type="button"
+            disabled={pendente}
+            onClick={() => fotoInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-sheipe hover:text-ink disabled:opacity-50"
+          >
+            <Camera size={13} strokeWidth={1.75} /> Foto do prato
+          </button>
           {falaDisponivel && (
             <button
               type="button"
