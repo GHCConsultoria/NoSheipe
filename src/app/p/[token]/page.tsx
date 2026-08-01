@@ -28,6 +28,7 @@ export default async function PaginaCliente({ params }: { params: { token: strin
       nutricao={painel.nutricao}
       treino={painel.treino}
       hidratacao={painel.hidratacao}
+      ofensiva={painel.ofensiva}
     />
   );
 }

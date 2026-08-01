@@ -9,6 +9,7 @@ import {
 } from "@/lib/nutri/aderencia";
 import { calcularAderenciaTreino, type AderenciaTreino } from "@/lib/personal/aderencia";
 import { calcularHidratacao, type Hidratacao } from "@/lib/cliente/hidratacao";
+import { calcularOfensiva, type Ofensiva } from "@/lib/cliente/ofensiva";
 
 export async function buscarClientePorToken(token: string) {
   const cliente = await prismaNutri.cliente.findUnique({ where: { tokenAcesso: token } });
@@ -67,6 +68,8 @@ export interface BlocoNutricao {
   }[];
   favoritos: { id: string; descricao: string }[];
   ultimoPesoKg: number | null;
+  /** Série de peso pro gráfico de evolução (ordem cronológica). */
+  pesoSerie: { valor: number; rotulo: string }[];
 }
 
 export interface BlocoTreino {
@@ -83,6 +86,8 @@ export interface PainelDoCliente {
   treino: BlocoTreino | null;
   /** Hidratação do dia — independe de vínculo; todo mundo bebe água. */
   hidratacao: Hidratacao;
+  /** Ofensiva: dias seguidos com registro — independe de vínculo. */
+  ofensiva: Ofensiva;
   /** Quem acompanha hoje — o cliente pode encerrar qualquer um. */
   vinculosAtivos: VinculoDoCliente[];
   /** Profissionais que pediram acesso e aguardam a resposta dele. */
@@ -94,6 +99,47 @@ const FORMATADOR_HORA = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",
   minute: "2-digit",
 });
+
+/** Chave "yyyy-mm-dd" no fuso de SP — a mesma base da ofensiva e do histórico. */
+const CHAVE_DIA_SP = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
+
+/** Rótulo curto dd/mm pro gráfico de peso. */
+const FORMATADOR_DATA_CURTA = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  day: "2-digit",
+  month: "2-digit",
+});
+
+/** Janela pra trás usada pra medir a ofensiva. Passado isto, não conta. */
+const DIAS_JANELA_OFENSIVA = 400;
+
+/**
+ * Ofensiva do cliente: dias-calendário seguidos com QUALQUER registro
+ * (refeição, treino ou água). Junta só os carimbos de data das três tabelas
+ * numa janela larga e delega a contagem à função pura.
+ */
+async function montarOfensiva(clienteId: string): Promise<Ofensiva> {
+  const desde = new Date(Date.now() - DIAS_JANELA_OFENSIVA * 24 * 60 * 60 * 1000);
+
+  const [refeicoes, sessoes, aguas] = await Promise.all([
+    prismaNutri.refeicao.findMany({ where: { clienteId, registradoEm: { gte: desde } }, select: { registradoEm: true } }),
+    prismaNutri.sessaoTreino.findMany({
+      where: { clienteId, realizadoEm: { gte: desde } },
+      select: { realizadoEm: true },
+    }),
+    prismaNutri.registroAgua.findMany({
+      where: { clienteId, registradoEm: { gte: desde } },
+      select: { registradoEm: true },
+    }),
+  ]);
+
+  const dias = new Set<string>();
+  for (const r of refeicoes) dias.add(CHAVE_DIA_SP.format(r.registradoEm));
+  for (const s of sessoes) dias.add(CHAVE_DIA_SP.format(s.realizadoEm));
+  for (const a of aguas) dias.add(CHAVE_DIA_SP.format(a.registradoEm));
+
+  return calcularOfensiva(dias, CHAVE_DIA_SP.format(new Date()));
+}
 
 /**
  * Tudo que a home do cliente precisa, numa consulta só: o progresso do dia
@@ -107,30 +153,41 @@ export async function buscarPainelDoCliente(cliente: Cliente): Promise<PainelDoC
   const { ativos, pendentes, temNutricao, temTreino } = await vinculosVivos(cliente.id);
   const { inicio: inicioHoje, fim: fimHoje } = limitesDoDiaEmSaoPaulo();
 
-  const [nutricao, treino, aguaHoje] = await Promise.all([
+  const [nutricao, treino, aguaHoje, ofensiva] = await Promise.all([
     temNutricao ? montarBlocoNutricao(cliente.id, inicioHoje, fimHoje) : Promise.resolve(null),
     temTreino ? montarBlocoTreino(cliente.id, inicioHoje, fimHoje) : Promise.resolve(null),
     prismaNutri.registroAgua.findMany({
       where: { clienteId: cliente.id, registradoEm: { gte: inicioHoje, lt: fimHoje } },
       select: { ml: true },
     }),
+    montarOfensiva(cliente.id),
   ]);
 
   const hidratacao = calcularHidratacao(aguaHoje, cliente.metaAguaMl);
 
-  return { cliente, nutricao, treino, hidratacao, vinculosAtivos: ativos, solicitacoes: pendentes };
+  return { cliente, nutricao, treino, hidratacao, ofensiva, vinculosAtivos: ativos, solicitacoes: pendentes };
 }
 
 async function montarBlocoNutricao(clienteId: string, inicioHoje: Date, fimHoje: Date): Promise<BlocoNutricao> {
-  const [plano, refeicoes, favoritos, ultimaMedida] = await Promise.all([
+  // Série de peso dos últimos 90 dias, cronológica — vira o gráfico e a
+  // última medida (o topo da série), sem uma segunda consulta só pro "último".
+  const desdePeso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+  const [plano, refeicoes, favoritos, medidas] = await Promise.all([
     prismaNutri.planoNutricional.findFirst({ where: { clienteId, ativo: true }, orderBy: { criadoEm: "desc" } }),
     prismaNutri.refeicao.findMany({
       where: { clienteId, registradoEm: { gte: inicioHoje, lt: fimHoje } },
       orderBy: { registradoEm: "asc" },
     }),
     prismaNutri.favorito.findMany({ where: { clienteId }, orderBy: { criadoEm: "desc" }, take: 6 }),
-    prismaNutri.medida.findFirst({ where: { clienteId }, orderBy: { registradoEm: "desc" } }),
+    prismaNutri.medida.findMany({
+      where: { clienteId, registradoEm: { gte: desdePeso } },
+      orderBy: { registradoEm: "asc" },
+    }),
   ]);
+
+  const pesoSerie = medidas.map((m) => ({ valor: m.pesoKg, rotulo: FORMATADOR_DATA_CURTA.format(m.registradoEm) }));
+  const ultimoPesoKg = medidas.length > 0 ? medidas[medidas.length - 1].pesoKg : null;
 
   // Sem plano ativo as metas ficam zeradas — calcularSaldoDoDia já devolve
   // 0% nesse caso, em vez de inventar um número.
@@ -151,7 +208,8 @@ async function montarBlocoNutricao(clienteId: string, inicioHoje: Date, fimHoje:
       horario: FORMATADOR_HORA.format(r.registradoEm),
     })),
     favoritos: favoritos.map((f) => ({ id: f.id, descricao: f.descricao })),
-    ultimoPesoKg: ultimaMedida?.pesoKg ?? null,
+    ultimoPesoKg,
+    pesoSerie,
   };
 }
 

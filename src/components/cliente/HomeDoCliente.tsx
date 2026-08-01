@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Droplet, Mic, Plus, Square, Undo2, X } from "lucide-react";
+import { Droplet, Flame, Mic, Plus, Square, Undo2, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
+import { GraficoLinha } from "@/components/shared/GraficoLinha";
 import {
   ajustarRefeicao,
   definirMetaAgua,
@@ -47,6 +48,7 @@ interface Props {
     }[];
     favoritos: { id: string; descricao: string }[];
     ultimoPesoKg: number | null;
+    pesoSerie: { valor: number; rotulo: string }[];
   } | null;
   treino: {
     treino: { nome: string; descricao: string; diasPorSemana: number } | null;
@@ -54,6 +56,7 @@ interface Props {
     sessoesHoje: { id: string; entradaBruta: string; horario: string }[];
   } | null;
   hidratacao: { consumidoMl: number; metaMl: number; percentual: number; copoMl: number };
+  ofensiva: { dias: number; ativaHoje: boolean };
 }
 
 /**
@@ -64,7 +67,7 @@ interface Props {
  * Cada bloco só aparece se existir o profissional correspondente — quem só
  * tem nutricionista nunca vê nada de treino.
  */
-export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, treino, hidratacao }: Props) {
+export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, treino, hidratacao, ofensiva }: Props) {
   const semAcompanhamento = !nutricao && !treino;
 
   return (
@@ -94,6 +97,8 @@ export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, tr
             <AnelDeProgresso arcos={montarArcos(nutricao, treino)} />
           </section>
 
+          {ofensiva.dias > 0 && <Ofensiva ofensiva={ofensiva} />}
+
           {treino && !treino.aderenciaSemana && (
             <p className="mt-4 text-center text-sm text-attention">Seu personal ainda não prescreveu um treino.</p>
           )}
@@ -107,7 +112,9 @@ export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, tr
           <BlocoAgua token={token} hidratacao={hidratacao} />
 
           {nutricao && <BlocoRefeicao token={token} favoritos={nutricao.favoritos} registros={nutricao.registrosHoje} />}
-          {nutricao && <BlocoPeso token={token} ultimoPesoKg={nutricao.ultimoPesoKg} />}
+          {nutricao && (
+            <BlocoPeso token={token} ultimoPesoKg={nutricao.ultimoPesoKg} pesoSerie={nutricao.pesoSerie} />
+          )}
 
         </>
       )}
@@ -443,6 +450,30 @@ function BlocoRefeicao({
   );
 }
 
+/**
+ * Ofensiva — dias seguidos com registro. Some quando é zero (nada a
+ * comemorar ainda); quando hoje ainda não teve registro, a sequência de
+ * ontem aparece como "em risco", pra empurrar o registro do dia.
+ */
+function Ofensiva({ ofensiva }: { ofensiva: NonNullable<Props["ofensiva"]> }) {
+  const { dias, ativaHoje } = ofensiva;
+  return (
+    <div className="mt-4 flex justify-center">
+      <div
+        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
+          ativaHoje ? "border-attention-line text-attention" : "border-rule text-ink-soft"
+        }`}
+      >
+        <Flame size={16} strokeWidth={2} className={ativaHoje ? "text-attention" : "text-ink-faint"} />
+        <span className="font-medium">
+          {dias} {dias === 1 ? "dia" : "dias"} seguidos
+        </span>
+        {!ativaHoje && <span className="text-xs text-ink-faint">· registre hoje pra não perder</span>}
+      </div>
+    </div>
+  );
+}
+
 function BlocoAgua({
   token,
   hidratacao,
@@ -564,7 +595,15 @@ function BlocoAgua({
   );
 }
 
-function BlocoPeso({ token, ultimoPesoKg }: { token: string; ultimoPesoKg: number | null }) {
+function BlocoPeso({
+  token,
+  ultimoPesoKg,
+  pesoSerie,
+}: {
+  token: string;
+  ultimoPesoKg: number | null;
+  pesoSerie: { valor: number; rotulo: string }[];
+}) {
   const router = useRouter();
   const [peso, setPeso] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -576,6 +615,13 @@ function BlocoPeso({ token, ultimoPesoKg }: { token: string; ultimoPesoKg: numbe
         <h2 className="eyebrow">Peso</h2>
         {ultimoPesoKg !== null && <span className="text-xs text-ink-faint">último: {ultimoPesoKg} kg</span>}
       </div>
+
+      {/* GraficoLinha só desenha com 2+ pontos; some sozinho no começo. */}
+      {pesoSerie.length >= 2 && (
+        <div className="mt-3">
+          <GraficoLinha pontos={pesoSerie} sufixo=" kg" />
+        </div>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
