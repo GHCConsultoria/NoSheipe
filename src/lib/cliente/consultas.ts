@@ -8,6 +8,7 @@ import {
   type SaldoDoDia,
 } from "@/lib/nutri/aderencia";
 import { calcularAderenciaTreino, type AderenciaTreino } from "@/lib/personal/aderencia";
+import { calcularHidratacao, type Hidratacao } from "@/lib/cliente/hidratacao";
 
 export async function buscarClientePorToken(token: string) {
   const cliente = await prismaNutri.cliente.findUnique({ where: { tokenAcesso: token } });
@@ -80,6 +81,8 @@ export interface PainelDoCliente {
   nutricao: BlocoNutricao | null;
   /** null quando o cliente não tem personal. */
   treino: BlocoTreino | null;
+  /** Hidratação do dia — independe de vínculo; todo mundo bebe água. */
+  hidratacao: Hidratacao;
   /** Quem acompanha hoje — o cliente pode encerrar qualquer um. */
   vinculosAtivos: VinculoDoCliente[];
   /** Profissionais que pediram acesso e aguardam a resposta dele. */
@@ -104,12 +107,18 @@ export async function buscarPainelDoCliente(cliente: Cliente): Promise<PainelDoC
   const { ativos, pendentes, temNutricao, temTreino } = await vinculosVivos(cliente.id);
   const { inicio: inicioHoje, fim: fimHoje } = limitesDoDiaEmSaoPaulo();
 
-  const [nutricao, treino] = await Promise.all([
+  const [nutricao, treino, aguaHoje] = await Promise.all([
     temNutricao ? montarBlocoNutricao(cliente.id, inicioHoje, fimHoje) : Promise.resolve(null),
     temTreino ? montarBlocoTreino(cliente.id, inicioHoje, fimHoje) : Promise.resolve(null),
+    prismaNutri.registroAgua.findMany({
+      where: { clienteId: cliente.id, registradoEm: { gte: inicioHoje, lt: fimHoje } },
+      select: { ml: true },
+    }),
   ]);
 
-  return { cliente, nutricao, treino, vinculosAtivos: ativos, solicitacoes: pendentes };
+  const hidratacao = calcularHidratacao(aguaHoje, cliente.metaAguaMl);
+
+  return { cliente, nutricao, treino, hidratacao, vinculosAtivos: ativos, solicitacoes: pendentes };
 }
 
 async function montarBlocoNutricao(clienteId: string, inicioHoje: Date, fimHoje: Date): Promise<BlocoNutricao> {

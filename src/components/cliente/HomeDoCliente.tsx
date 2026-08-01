@@ -3,16 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Mic, Square, X } from "lucide-react";
+import { Droplet, Mic, Plus, Square, Undo2, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
 import {
   ajustarRefeicao,
+  definirMetaAgua,
   estimarRefeicao,
+  registrarAgua,
   registrarPeso,
   removerFavorito,
   removerRefeicao,
+  removerUltimaAgua,
   salvarFavorito,
 } from "@/lib/cliente/publico";
 import { AnelDeProgresso, type Arco } from "@/components/shared/AnelDeProgresso";
@@ -50,6 +53,7 @@ interface Props {
     aderenciaSemana: { diasTreinados: number; diasPorSemana: number; percentual: number } | null;
     sessoesHoje: { id: string; entradaBruta: string; horario: string }[];
   } | null;
+  hidratacao: { consumidoMl: number; metaMl: number; percentual: number; copoMl: number };
 }
 
 /**
@@ -60,7 +64,7 @@ interface Props {
  * Cada bloco só aparece se existir o profissional correspondente — quem só
  * tem nutricionista nunca vê nada de treino.
  */
-export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, treino }: Props) {
+export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, treino, hidratacao }: Props) {
   const semAcompanhamento = !nutricao && !treino;
 
   return (
@@ -99,6 +103,8 @@ export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, tr
               <CompartilharResumoDoDia nomePaciente={nome} saldo={nutricao.saldo} />
             </div>
           )}
+
+          <BlocoAgua token={token} hidratacao={hidratacao} />
 
           {nutricao && <BlocoRefeicao token={token} favoritos={nutricao.favoritos} registros={nutricao.registrosHoje} />}
           {nutricao && <BlocoPeso token={token} ultimoPesoKg={nutricao.ultimoPesoKg} />}
@@ -433,6 +439,127 @@ function BlocoRefeicao({
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+function BlocoAgua({
+  token,
+  hidratacao,
+}: {
+  token: string;
+  hidratacao: NonNullable<Props["hidratacao"]>;
+}) {
+  const router = useRouter();
+  const [pendente, iniciarTransicao] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+  const [editandoMeta, setEditandoMeta] = useState(false);
+  const [rascunhoMeta, setRascunhoMeta] = useState(String(hidratacao.metaMl));
+
+  const { consumidoMl, metaMl, percentual, copoMl } = hidratacao;
+  // A barra é visual: trava em 100% mesmo quando bebeu além da meta. O número
+  // ao lado continua mostrando o percentual real, sem teto.
+  const larguraBarra = Math.min(100, percentual);
+  const copos = Math.round(consumidoMl / copoMl);
+
+  function agir(acao: () => Promise<{ sucesso: boolean; erro?: string }>) {
+    setErro(null);
+    iniciarTransicao(async () => {
+      const resultado = await acao();
+      if (!resultado.sucesso) setErro(resultado.erro ?? "não deu — tente de novo");
+      router.refresh();
+    });
+  }
+
+  function salvarMeta() {
+    setErro(null);
+    iniciarTransicao(async () => {
+      const resultado = await definirMetaAgua({ token, metaMl: rascunhoMeta });
+      if (!resultado.sucesso) {
+        setErro(resultado.erro);
+        return;
+      }
+      setEditandoMeta(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <section className="paper-card mt-8 rounded-sm p-4">
+      <div className="flex items-baseline justify-between">
+        <h2 className="eyebrow flex items-center gap-1.5">
+          <Droplet size={13} strokeWidth={1.75} className="text-treino" /> Água
+        </h2>
+        <button
+          type="button"
+          onClick={() => {
+            setRascunhoMeta(String(metaMl));
+            setEditandoMeta((v) => !v);
+          }}
+          className="text-xs text-ink-faint underline underline-offset-2 transition-colors hover:text-treino"
+        >
+          {consumidoMl} / {metaMl} ml
+        </button>
+      </div>
+
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-paper">
+        <div
+          className="barra-preenche h-full rounded-full bg-treino transition-[width] duration-500"
+          style={{ width: `${larguraBarra}%` }}
+        />
+      </div>
+      <p className="mt-1.5 text-xs text-ink-faint">
+        {copos > 0 ? `${copos} ${copos === 1 ? "copo" : "copos"} hoje` : "nenhum copo ainda"} · {percentual}% da meta
+      </p>
+
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          disabled={pendente}
+          onClick={() => agir(() => registrarAgua({ token }))}
+          className="tatil inline-flex items-center gap-1.5 rounded-sm bg-treino px-4 py-2 text-sm font-medium text-treino-on shadow-sm transition-colors hover:opacity-90 disabled:opacity-50"
+        >
+          <Plus size={16} strokeWidth={2.25} /> Copo ({copoMl} ml)
+        </button>
+        {consumidoMl > 0 && (
+          <button
+            type="button"
+            disabled={pendente}
+            aria-label="Desfazer último copo"
+            onClick={() => agir(() => removerUltimaAgua({ token }))}
+            className="tatil inline-flex items-center gap-1 rounded-sm border border-rule px-3 py-2 text-xs text-ink-soft transition-colors hover:border-treino hover:text-ink disabled:opacity-50"
+          >
+            <Undo2 size={14} /> Desfazer
+          </button>
+        )}
+      </div>
+
+      {editandoMeta && (
+        <div className="mt-3 flex items-end gap-2">
+          <label className="flex flex-col gap-0.5 text-[0.65rem] text-ink-faint">
+            Meta diária (ml)
+            <input
+              type="number"
+              min={250}
+              step={250}
+              inputMode="numeric"
+              value={rascunhoMeta}
+              onChange={(e) => setRascunhoMeta(e.target.value)}
+              className="w-28 rounded-sm border border-rule bg-paper px-2 py-1 text-sm outline-none focus:border-treino"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={pendente}
+            onClick={salvarMeta}
+            className="tatil rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-treino hover:text-ink disabled:opacity-50"
+          >
+            Salvar meta
+          </button>
+        </div>
+      )}
+
+      {erro && <p className="mt-2 text-sm text-urgent">{erro}</p>}
     </section>
   );
 }

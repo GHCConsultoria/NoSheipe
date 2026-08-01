@@ -47,6 +47,9 @@
      vital, não como enfeite. */
   --color-treino: #22d3ee;
   --color-treino-deep: #67e8f9;
+  /* Texto sobre o ciano do treino. Espelha --color-on-sheipe: o ciano é
+     claro no escuro, então o texto por cima é escuro. */
+  --color-on-treino: #04141a;
 
   /* Fixas — não trocam com o tema. Painel de assinatura (login) fica sempre
      no mesmo tom, mesmo se o resto virar claro. */
@@ -96,6 +99,8 @@
     --color-on-sheipe: #f0fdf4;
     --color-treino: #0891b2;
     --color-treino-deep: #0e7490;
+    /* Ciano mais escuro no claro — texto por cima fica claro. */
+    --color-on-treino: #ecfeff;
 
     --shadow-card: 0 1px 2px rgba(16, 18, 21, 0.04), 0 8px 24px -12px rgba(16, 18, 21, 0.12);
   }
@@ -129,6 +134,7 @@
   --color-on-sheipe: #04150a;
   --color-treino: #22d3ee;
   --color-treino-deep: #67e8f9;
+  --color-on-treino: #04141a;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
@@ -153,6 +159,7 @@
   --color-on-sheipe: #f0fdf4;
   --color-treino: #0891b2;
   --color-treino-deep: #0e7490;
+  --color-on-treino: #ecfeff;
   --shadow-card: 0 1px 2px rgba(16, 18, 21, 0.04), 0 8px 24px -12px rgba(16, 18, 21, 0.12);
 }
 

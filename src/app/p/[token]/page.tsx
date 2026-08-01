@@ -27,6 +27,7 @@ export default async function PaginaCliente({ params }: { params: { token: strin
       solicitacoesPendentes={painel.solicitacoes.length}
       nutricao={painel.nutricao}
       treino={painel.treino}
+      hidratacao={painel.hidratacao}
     />
   );
 }

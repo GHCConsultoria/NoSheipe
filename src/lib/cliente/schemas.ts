@@ -140,6 +140,24 @@ export const registrarPesoSchema = tokenSchema.extend({
   pesoKg: z.coerce.number().positive("peso deve ser positivo").max(500, "peso fora do intervalo plausível"),
 });
 
+/**
+ * Um copo d'água. `ml` é opcional: o botão de 1 toque manda sem valor e a
+ * ação usa o copo padrão; o teto evita erro grosseiro de digitação se algum
+ * dia houver campo livre.
+ */
+export const registrarAguaSchema = tokenSchema.extend({
+  ml: z.coerce.number().int().positive("volume deve ser positivo").max(5000, "volume fora do plausível").optional(),
+});
+
+/** Cliente ajustando a própria meta diária de água. */
+export const definirMetaAguaSchema = tokenSchema.extend({
+  metaMl: z.coerce
+    .number()
+    .int()
+    .min(250, "meta mínima de 250 ml")
+    .max(10000, "meta fora do plausível"),
+});
+
 export const registrarSchema = tokenSchema.extend({
   clientLogId: z.string().uuid("clientLogId deve ser um UUID"),
   rawText: z.string().trim().min(1, "descreva o que aconteceu"),

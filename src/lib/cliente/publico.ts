@@ -7,7 +7,9 @@ import {
   StatusCliente,
   StatusVinculo,
   ajustarMacrosSchema,
+  definirMetaAguaSchema,
   favoritoSchema,
+  registrarAguaSchema,
   registrarPesoSchema,
   registrarSchema,
   removerFavoritoSchema,
@@ -15,6 +17,8 @@ import {
   tokenSchema,
   vinculoDoClienteSchema,
 } from "@/lib/cliente/schemas";
+import { COPO_PADRAO_ML } from "@/lib/cliente/hidratacao";
+import { limitesDoDiaEmSaoPaulo } from "@/lib/nutri/aderencia";
 
 export type ResultadoAcaoPublica = { sucesso: true } | { sucesso: false; erro: string };
 
@@ -141,6 +145,74 @@ export async function registrarPeso(input: unknown): Promise<ResultadoAcaoPublic
   if (!cliente.consentimentoEm) return { sucesso: false, erro: "consentimento obrigatório antes de registrar" };
 
   await prismaNutri.medida.create({ data: { clienteId: cliente.id, pesoKg: parsed.data.pesoKg } });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Um copo d'água. 1 toque = 1 linha; o total do dia é a soma delas. Sem
+ * dedupe idempotente de propósito: dois toques são dois copos, não um
+ * registro repetido.
+ */
+export async function registrarAgua(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = registrarAguaSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "volume inválido" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+  if (!cliente.consentimentoEm) return { sucesso: false, erro: "consentimento obrigatório antes de registrar" };
+
+  await prismaNutri.registroAgua.create({
+    data: { clienteId: cliente.id, ml: parsed.data.ml ?? COPO_PADRAO_ML },
+  });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Desfaz o último copo de hoje — para o toque errado. Água é métrica
+ * efêmera auto-relatada, não registro clínico, então aqui DELETE é de
+ * verdade (ao contrário de refeição/peso); some da soma e do histórico. O
+ * filtro por clienteId impede apagar o copo de outra pessoa sabendo o id.
+ */
+export async function removerUltimaAgua(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = tokenSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "token inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const { inicio, fim } = limitesDoDiaEmSaoPaulo();
+  const ultimo = await prismaNutri.registroAgua.findFirst({
+    where: { clienteId: cliente.id, registradoEm: { gte: inicio, lt: fim } },
+    orderBy: { registradoEm: "desc" },
+  });
+  if (!ultimo) return { sucesso: false, erro: "nada para desfazer hoje" };
+
+  await prismaNutri.registroAgua.delete({ where: { id: ultimo.id } });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/** Cliente ajusta a própria meta diária de água. */
+export async function definirMetaAgua(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = definirMetaAguaSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "meta inválida" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.cliente.update({
+    where: { id: cliente.id },
+    data: { metaAguaMl: parsed.data.metaMl },
+  });
 
   revalidatePath(`/p/${parsed.data.token}`);
   return { sucesso: true };

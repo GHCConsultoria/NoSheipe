@@ -380,3 +380,28 @@ ALTER TABLE "refeicoes" ADD COLUMN "macrosPendentes" BOOLEAN NOT NULL DEFAULT fa
 -- A pessoa pode corrigir os macros na mão; esta flag rotula "ajustado por
 -- você" em vez de "estimativa". Idempotente como os ALTERs acima.
 ALTER TABLE "refeicoes" ADD COLUMN "ajustadoManualmente" BOOLEAN NOT NULL DEFAULT false;
+
+
+-- ============================================================
+-- Hidratação (água). Cada toque no copo é uma linha; o total do
+-- dia é uma soma. A meta diária vive no próprio cliente.
+-- ============================================================
+
+-- AlterTable
+-- Meta diária de água, ajustável pelo cliente. ADD COLUMN sem "IF NOT EXISTS"
+-- no SQLite: a segunda passada falha com "duplicate column name", que
+-- aplicar-schema trata como "já aplicado" — idempotente como os ALTERs acima.
+ALTER TABLE "clientes" ADD COLUMN "metaAguaMl" INTEGER NOT NULL DEFAULT 2000;
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "registros_agua" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "ml" INTEGER NOT NULL,
+    "registradoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "registros_agua_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+-- O total do dia filtra por cliente + janela de tempo; o índice serve as duas.
+CREATE INDEX IF NOT EXISTS "registros_agua_clienteId_registradoEm_idx" ON "registros_agua"("clienteId", "registradoEm");

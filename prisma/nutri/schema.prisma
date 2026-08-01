@@ -102,12 +102,17 @@ model Cliente {
   alturaCm       Int?
   objetivo       String?
 
+  // Meta diária de água, em ml. É do cliente (hidratação não se prescreve),
+  // então ele ajusta na própria página; 2000ml é só o ponto de partida.
+  metaAguaMl Int @default(2000)
+
   vinculos            Vinculo[]
   planosNutricionais  PlanoNutricional[]
   treinos             TreinoPrescrito[]
   refeicoes           Refeicao[]
   sessoesTreino       SessaoTreino[]
   medidas             Medida[]
+  registrosAgua       RegistroAgua[]
   anotacoes           Anotacao[]
   favoritos           Favorito[]
   anamneseNutricional AnamneseNutricional?
@@ -267,6 +272,23 @@ model Medida {
   registradoEm DateTime @default(now())
 
   @@map("medidas")
+}
+
+/// Copo d'água que o cliente registrou. Um toque = uma linha, para o total
+/// do dia sair de uma soma (nunca de um contador guardado, que dessincroniza).
+/// Métrica auto-relatada e efêmera — desfazer um toque errado é DELETE de
+/// verdade, ao contrário de refeição/peso, que são registro clínico.
+model RegistroAgua {
+  id String @id @default(cuid())
+
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  clienteId String
+
+  ml Int
+
+  registradoEm DateTime @default(now())
+
+  @@map("registros_agua")
 }
 
 /// Anotação privada do profissional sobre o cliente. Guarda profissionalId
