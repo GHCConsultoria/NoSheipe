@@ -83,9 +83,9 @@ test.describe("a barra de navegação do cliente", () => {
     await page.goto("/p/demo-marina-souza");
     const nav = page.getByRole("navigation", { name: "Navegação principal" });
 
-    await nav.getByRole("link", { name: "Histórico" }).click();
+    await nav.getByRole("link", { name: "Diário" }).click();
     await expect(page).toHaveURL(/\/historico$/);
-    await expect(nav.getByRole("link", { name: "Histórico" })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: "Diário" })).toHaveAttribute("aria-current", "page");
 
     await nav.getByRole("link", { name: "Perfil" }).click();
     await expect(page).toHaveURL(/\/perfil$/);

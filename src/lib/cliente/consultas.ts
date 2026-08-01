@@ -205,18 +205,67 @@ export async function buscarHistoricoDeDias(clienteId: string, dias = 14) {
 
 /**
  * O que a barra de rodapé precisa saber, sem carregar o painel inteiro:
- * quantos pedidos esperam resposta (o distintivo) e se existe nutrição
- * ativa (sem ela não há histórico de dieta pra mostrar).
+ * quantos pedidos esperam resposta (o distintivo) e quais vínculos ativos
+ * existem — a barra mostra "Diário" e o "+" só com nutrição, e "Treino" só
+ * com personal. Sem o vínculo do tipo, a aba nem aparece.
  */
 export async function buscarResumoDaNavegacao(clienteId: string) {
-  const [pendentes, nutricaoAtiva] = await Promise.all([
+  const [pendentes, nutricaoAtiva, treinoAtivo] = await Promise.all([
     prismaNutri.vinculo.count({ where: { clienteId, status: StatusVinculo.PENDENTE } }),
     prismaNutri.vinculo.findFirst({
       where: { clienteId, status: StatusVinculo.ATIVO, tipo: TipoVinculo.NUTRICAO },
       select: { id: true },
     }),
+    prismaNutri.vinculo.findFirst({
+      where: { clienteId, status: StatusVinculo.ATIVO, tipo: TipoVinculo.TREINO },
+      select: { id: true },
+    }),
   ]);
-  return { pendentes, temNutricao: nutricaoAtiva !== null };
+  return { pendentes, temNutricao: nutricaoAtiva !== null, temTreino: treinoAtivo !== null };
+}
+
+const FORMATADOR_DIA = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  weekday: "short",
+  day: "2-digit",
+  month: "2-digit",
+});
+
+export interface TreinoDoClienteDados {
+  treino: { nome: string; descricao: string; diasPorSemana: number } | null;
+  aderenciaSemana: AderenciaTreino | null;
+  sessoes: { id: string; entradaBruta: string; dia: string; horario: string }[];
+}
+
+/**
+ * Tudo que a aba Treino precisa: o treino prescrito ativo, a aderência da
+ * semana (mesmo cálculo do anel da home) e as últimas sessões registradas —
+ * histórico mais fundo que o "hoje" do painel.
+ */
+export async function buscarTreinoDoCliente(clienteId: string, dias = 14): Promise<TreinoDoClienteDados> {
+  const { inicio: inicioSemana, fim: fimSemana } = limitesDaSemanaEmSaoPaulo();
+  const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+
+  const [treino, sessoesSemana, sessoes] = await Promise.all([
+    prismaNutri.treinoPrescrito.findFirst({ where: { clienteId, ativo: true }, orderBy: { criadoEm: "desc" } }),
+    prismaNutri.sessaoTreino.findMany({ where: { clienteId, realizadoEm: { gte: inicioSemana, lt: fimSemana } } }),
+    prismaNutri.sessaoTreino.findMany({
+      where: { clienteId, realizadoEm: { gte: desde } },
+      orderBy: { realizadoEm: "desc" },
+      take: 30,
+    }),
+  ]);
+
+  return {
+    treino: treino ? { nome: treino.nome, descricao: treino.descricao, diasPorSemana: treino.diasPorSemana } : null,
+    aderenciaSemana: treino ? calcularAderenciaTreino(sessoesSemana, treino.diasPorSemana) : null,
+    sessoes: sessoes.map((s) => ({
+      id: s.id,
+      entradaBruta: s.entradaBruta,
+      dia: FORMATADOR_DIA.format(s.realizadoEm),
+      horario: FORMATADOR_HORA.format(s.realizadoEm),
+    })),
+  };
 }
 
 export async function buscarPesoDoCliente(clienteId: string, dias = 90) {

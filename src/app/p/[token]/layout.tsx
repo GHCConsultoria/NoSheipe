@@ -42,14 +42,14 @@ export default async function LayoutDoCliente({
     return <>{children}</>;
   }
 
-  const { pendentes, temNutricao } = await buscarResumoDaNavegacao(cliente.id);
+  const { pendentes, temNutricao, temTreino } = await buscarResumoDaNavegacao(cliente.id);
 
   return (
     <>
       {/* pb-24 reserva a altura da barra fixa; sem isso ela cobre o fim da
           página, que é justo onde ficam os botões de registrar. */}
       <div className="entrada-aba pb-24">{children}</div>
-      <NavRodape token={params.token} pendentes={pendentes} mostrarHistorico={temNutricao} />
+      <NavRodape token={params.token} pendentes={pendentes} temNutricao={temNutricao} temTreino={temTreino} />
     </>
   );
 }

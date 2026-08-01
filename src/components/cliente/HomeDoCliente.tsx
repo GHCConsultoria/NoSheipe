@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Mic, Square, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
@@ -11,10 +11,8 @@ import {
   ajustarRefeicao,
   estimarRefeicao,
   registrarPeso,
-  registrarTreino,
   removerFavorito,
   removerRefeicao,
-  removerSessaoTreino,
   salvarFavorito,
 } from "@/lib/cliente/publico";
 import { AnelDeProgresso, type Arco } from "@/components/shared/AnelDeProgresso";
@@ -103,7 +101,6 @@ export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, tr
           )}
 
           {nutricao && <BlocoRefeicao token={token} favoritos={nutricao.favoritos} registros={nutricao.registrosHoje} />}
-          {treino && <BlocoTreino token={token} treino={treino.treino} sessoes={treino.sessoesHoje} />}
           {nutricao && <BlocoPeso token={token} ultimoPesoKg={nutricao.ultimoPesoKg} />}
 
         </>
@@ -160,6 +157,9 @@ function BlocoRefeicao({
   const [pendente, iniciarTransicao] = useTransition();
   const [falaDisponivel, setFalaDisponivel] = useState(false);
   const { gravando, erro: erroFala, iniciar, parar } = useReconhecimentoDeFala();
+  // O "+" da barra aponta pra #registrar; ao chegar com essa âncora, foca o
+  // campo pra a pessoa já digitar.
+  const campoRef = useRef<HTMLTextAreaElement>(null);
 
   // Ajuste manual dos macros: qual refeição está em edição e o rascunho dos
   // campos (string, porque vêm de <input>).
@@ -190,6 +190,11 @@ function BlocoRefeicao({
   }
 
   useEffect(() => setFalaDisponivel(reconhecimentoDeFalaDisponivel()), []);
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#registrar") {
+      campoRef.current?.focus({ preventScroll: true });
+    }
+  }, []);
 
   function registrar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -215,7 +220,7 @@ function BlocoRefeicao({
   }
 
   return (
-    <section className="mt-8">
+    <section id="registrar" className="mt-8 scroll-mt-6">
       <h2 className="eyebrow mb-3">O que você comeu</h2>
 
       {favoritos.length > 0 && (
@@ -248,6 +253,7 @@ function BlocoRefeicao({
 
       <form onSubmit={registrar} className="paper-card flex flex-col gap-3 rounded-sm p-4">
         <textarea
+          ref={campoRef}
           value={texto}
           onChange={(e) => {
             setTexto(e.target.value);
@@ -432,103 +438,6 @@ function BlocoRefeicao({
                   </button>
                 </div>
               )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function BlocoTreino({
-  token,
-  treino,
-  sessoes,
-}: {
-  token: string;
-  treino: { nome: string; descricao: string; diasPorSemana: number } | null;
-  sessoes: { id: string; entradaBruta: string; horario: string }[];
-}) {
-  const router = useRouter();
-  const [texto, setTexto] = useState("");
-  const [erro, setErro] = useState<string | null>(null);
-  const [pendente, iniciarTransicao] = useTransition();
-
-  function registrar(evento: React.FormEvent) {
-    evento.preventDefault();
-    if (!texto.trim()) return;
-    setErro(null);
-    iniciarTransicao(async () => {
-      const resultado = await registrarTreino({
-        token,
-        clientLogId: crypto.randomUUID(),
-        rawText: texto,
-        origem: "TEXTO",
-      });
-      if (!resultado.sucesso) {
-        setErro(resultado.erro);
-        return;
-      }
-      setTexto("");
-      router.refresh();
-    });
-  }
-
-  return (
-    <section className="mt-8">
-      <h2 className="eyebrow mb-3">Seu treino</h2>
-
-      {treino && (
-        <div className="paper-card mb-3 rounded-sm p-4">
-          <p className="font-display text-sm">{treino.nome}</p>
-          <p className="mt-1 text-sm text-ink-soft">{treino.descricao}</p>
-          <p className="mt-2 text-xs text-ink-faint">Meta: {treino.diasPorSemana}x por semana</p>
-        </div>
-      )}
-
-      <form onSubmit={registrar} className="paper-card flex flex-col gap-3 rounded-sm p-4">
-        <textarea
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          rows={2}
-          placeholder="ex.: Treino A completo"
-          className="w-full rounded-sm border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-sheipe"
-        />
-        {erro && <p className="text-sm text-urgent">{erro}</p>}
-        <button
-          type="submit"
-          disabled={pendente || !texto.trim()}
-          className="tatil self-start rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
-        >
-          {pendente ? "Registrando…" : "Registrar treino"}
-        </button>
-      </form>
-
-      {sessoes.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-3">
-          {sessoes.map((s) => (
-            <li key={s.id} className="paper-card rounded-sm p-4">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="text-sm">{s.entradaBruta}</p>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="font-data text-xs text-ink-faint">{s.horario}</span>
-                  <button
-                    type="button"
-                    disabled={pendente}
-                    aria-label={`Remover ${s.entradaBruta}`}
-                    onClick={() => {
-                      if (!window.confirm("Remover este treino? A aderência da semana é recalculada.")) return;
-                      iniciarTransicao(async () => {
-                        await removerSessaoTreino({ token, registroId: s.id });
-                        router.refresh();
-                      });
-                    }}
-                    className="tatil text-ink-faint transition-colors hover:text-urgent disabled:opacity-50"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
             </li>
           ))}
         </ul>
