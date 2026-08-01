@@ -27,6 +27,7 @@ export type StatusVinculo = (typeof StatusVinculo)[keyof typeof StatusVinculo];
 export const OrigemRegistro = {
   AUDIO: "AUDIO",
   TEXTO: "TEXTO",
+  FOTO: "FOTO",
 } as const;
 export type OrigemRegistro = (typeof OrigemRegistro)[keyof typeof OrigemRegistro];
 
@@ -134,16 +135,62 @@ export const anotacaoSchema = clienteIdSchema.extend({
   texto: z.string().trim().min(1, "escreva alguma coisa"),
 });
 
+/** Recado do profissional pro cliente — texto com teto pra não virar dissertação. */
+export const recadoSchema = clienteIdSchema.extend({
+  texto: z.string().trim().min(1, "escreva o recado").max(1000, "recado longo demais"),
+});
+
+const nomeTemplate = z.string().trim().min(1, "dê um nome ao template").max(80, "nome longo demais");
+
+/** Template de metas nutricionais — reaproveita a validação de metas. */
+export const templateNutricaoSchema = z.object({ nome: nomeTemplate, metas: metasSchema });
+
+/** Template de treino — reaproveita a validação de treino. */
+export const templateTreinoSchema = z.object({ nome: nomeTemplate, treino: treinoSchema });
+
+export const removerTemplateSchema = z.object({ templateId: z.string().min(1) });
+
 export const tokenSchema = z.object({ token: z.string().min(1) });
 
 export const registrarPesoSchema = tokenSchema.extend({
   pesoKg: z.coerce.number().positive("peso deve ser positivo").max(500, "peso fora do intervalo plausível"),
 });
 
+/**
+ * Um copo d'água. `ml` é opcional: o botão de 1 toque manda sem valor e a
+ * ação usa o copo padrão; o teto evita erro grosseiro de digitação se algum
+ * dia houver campo livre.
+ */
+export const registrarAguaSchema = tokenSchema.extend({
+  ml: z.coerce.number().int().positive("volume deve ser positivo").max(5000, "volume fora do plausível").optional(),
+});
+
+/** Cliente ajustando a própria meta diária de água. */
+export const definirMetaAguaSchema = tokenSchema.extend({
+  metaMl: z.coerce
+    .number()
+    .int()
+    .min(250, "meta mínima de 250 ml")
+    .max(10000, "meta fora do plausível"),
+});
+
 export const registrarSchema = tokenSchema.extend({
   clientLogId: z.string().uuid("clientLogId deve ser um UUID"),
   rawText: z.string().trim().min(1, "descreva o que aconteceu"),
   origem: z.nativeEnum(OrigemRegistro).default(OrigemRegistro.TEXTO),
+});
+
+/**
+ * Registro de refeição por FOTO. A imagem vai em base64 (sem o prefixo
+ * data:) e o mediaType diz o formato. Teto de ~9 MB de base64 (~6,5 MB de
+ * imagem) evita corpo gigante — o cliente reduz antes de enviar.
+ */
+export const registrarFotoSchema = tokenSchema.extend({
+  clientLogId: z.string().uuid("clientLogId deve ser um UUID"),
+  imagemBase64: z.string().min(1, "imagem vazia").max(9_000_000, "imagem grande demais — tente uma menor"),
+  mediaType: z.enum(["image/jpeg", "image/png", "image/webp"], {
+    message: "formato de imagem não suportado",
+  }),
 });
 
 export const favoritoSchema = tokenSchema.extend({
@@ -192,4 +239,15 @@ export const solicitarVinculoSchema = z.object({
 /** Cliente respondendo sobre um vínculo seu — aceitar, recusar ou encerrar. */
 export const vinculoDoClienteSchema = tokenSchema.extend({
   vinculoId: z.string().min(1),
+});
+
+/** Inscrição de Web Push de um aparelho — o que o PushManager do navegador devolve. */
+export const inscricaoPushSchema = tokenSchema.extend({
+  endpoint: z.string().url("endpoint inválido"),
+  p256dh: z.string().min(1),
+  auth: z.string().min(1),
+});
+
+export const removerInscricaoPushSchema = tokenSchema.extend({
+  endpoint: z.string().url("endpoint inválido"),
 });

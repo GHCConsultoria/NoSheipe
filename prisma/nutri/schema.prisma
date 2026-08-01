@@ -57,6 +57,8 @@ model Profissional {
 
   vinculos  Vinculo[]
   anotacoes Anotacao[]
+  recados   Recado[]
+  templates Template[]
 
   // Obsoletos: donos da era Paciente/Aluno, antes do Cliente unificado.
   pacientes Paciente[]
@@ -102,13 +104,20 @@ model Cliente {
   alturaCm       Int?
   objetivo       String?
 
+  // Meta diária de água, em ml. É do cliente (hidratação não se prescreve),
+  // então ele ajusta na própria página; 2000ml é só o ponto de partida.
+  metaAguaMl Int @default(2000)
+
   vinculos            Vinculo[]
   planosNutricionais  PlanoNutricional[]
   treinos             TreinoPrescrito[]
   refeicoes           Refeicao[]
   sessoesTreino       SessaoTreino[]
   medidas             Medida[]
+  registrosAgua       RegistroAgua[]
   anotacoes           Anotacao[]
+  recados             Recado[]
+  inscricoesPush      PushSubscription[]
   favoritos           Favorito[]
   anamneseNutricional AnamneseNutricional?
   anamneseTreino      AnamneseTreino?
@@ -269,6 +278,23 @@ model Medida {
   @@map("medidas")
 }
 
+/// Copo d'água que o cliente registrou. Um toque = uma linha, para o total
+/// do dia sair de uma soma (nunca de um contador guardado, que dessincroniza).
+/// Métrica auto-relatada e efêmera — desfazer um toque errado é DELETE de
+/// verdade, ao contrário de refeição/peso, que são registro clínico.
+model RegistroAgua {
+  id String @id @default(cuid())
+
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  clienteId String
+
+  ml Int
+
+  registradoEm DateTime @default(now())
+
+  @@map("registros_agua")
+}
+
 /// Anotação privada do profissional sobre o cliente. Guarda profissionalId
 /// porque com clientes compartilhados a anotação da Ana não pode aparecer
 /// pro Bruno. Só-adição, sem editar nem apagar.
@@ -286,6 +312,80 @@ model Anotacao {
   criadoEm DateTime @default(now())
 
   @@map("anotacoes")
+}
+
+/// Recado do profissional PARA o cliente — o outro lado da anotação, que é
+/// privada. O cliente vê na home; guarda profissionalId pra mostrar quem
+/// mandou e pra o profissional ver o histórico do que enviou. lidoEm marca
+/// quando o cliente abriu, pro profissional saber se chegou.
+model Recado {
+  id String @id @default(cuid())
+
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  clienteId String
+
+  profissional   Profissional @relation(fields: [profissionalId], references: [id])
+  profissionalId String
+
+  texto  String
+  lidoEm DateTime?
+
+  criadoEm DateTime @default(now())
+
+  @@index([clienteId])
+  @@map("recados")
+}
+
+/// Modelo de prescrição salvo pelo profissional pra reusar em vários
+/// clientes — uma dieta ou treino "de prateleira". É do profissional, não
+/// do cliente; aplicar um template só preenche o formulário, a prescrição
+/// de verdade continua sendo TreinoPrescrito/PlanoNutricional. Ferramenta
+/// de conveniência, sem histórico clínico, então pode ser removido de fato.
+model Template {
+  id String @id @default(cuid())
+
+  profissional   Profissional @relation(fields: [profissionalId], references: [id])
+  profissionalId String
+
+  // "NUTRICAO" | "TREINO" — decide quais campos abaixo valem.
+  tipo String
+  nome String
+
+  // Preenchidos quando tipo = NUTRICAO.
+  metaKcal     Int?
+  metaProteina Int?
+  metaCarbo    Int?
+  metaGordura  Int?
+
+  // Preenchidos quando tipo = TREINO.
+  descricao     String?
+  diasPorSemana Int?
+
+  criadoEm DateTime @default(now())
+
+  @@index([profissionalId, tipo])
+  @@map("templates")
+}
+
+/// Inscrição de Web Push de UM aparelho do cliente (o mesmo cliente pode ter
+/// vários: celular, tablet). endpoint é a chave natural que o navegador dá;
+/// p256dh/auth são as chaves de cifragem da mensagem. Não é dado de negócio
+/// — expira sozinho e é recriado, então some de verdade quando o navegador
+/// avisa que morreu (404/410).
+model PushSubscription {
+  id String @id @default(cuid())
+
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  clienteId String
+
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  criadoEm DateTime @default(now())
+
+  @@index([clienteId])
+  @@map("push_subscriptions")
 }
 
 /// Atalho de conveniência do cliente — não é registro de negócio, então

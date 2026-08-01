@@ -137,6 +137,22 @@ describe("montarRequisicao", () => {
     expect(req.headers["anthropic-version"]).toBe("2023-06-01");
     expect(JSON.parse(req.body).model).toBe("claude-x");
   });
+
+  it("Anthropic com foto: content vira bloco image (base64) + texto", () => {
+    const provedor: Provedor = { nome: "anthropic", apiKey: "chave-a", modelo: "claude-x" };
+    const req = montarRequisicao(provedor, "descreva", 800, { base64: "AAAA", mediaType: "image/jpeg" });
+    const content = JSON.parse(req.body).messages[0].content;
+    expect(content[0]).toEqual({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: "AAAA" } });
+    expect(content[1]).toEqual({ type: "text", text: "descreva" });
+  });
+
+  it("dialeto OpenAI com foto: content vira texto + image_url data URL", () => {
+    const provedor: Provedor = { nome: "groq", apiKey: "chave-g", modelo: "llama-vision" };
+    const req = montarRequisicao(provedor, "descreva", 800, { base64: "BBBB", mediaType: "image/png" });
+    const content = JSON.parse(req.body).messages[0].content;
+    expect(content[0]).toEqual({ type: "text", text: "descreva" });
+    expect(content[1]).toEqual({ type: "image_url", image_url: { url: "data:image/png;base64,BBBB" } });
+  });
 });
 
 describe("extrairTexto", () => {

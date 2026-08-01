@@ -7,14 +7,20 @@ import {
   StatusCliente,
   StatusVinculo,
   ajustarMacrosSchema,
+  definirMetaAguaSchema,
   favoritoSchema,
+  inscricaoPushSchema,
+  registrarAguaSchema,
   registrarPesoSchema,
   registrarSchema,
   removerFavoritoSchema,
+  removerInscricaoPushSchema,
   removerRegistroSchema,
   tokenSchema,
   vinculoDoClienteSchema,
 } from "@/lib/cliente/schemas";
+import { COPO_PADRAO_ML } from "@/lib/cliente/hidratacao";
+import { limitesDoDiaEmSaoPaulo } from "@/lib/nutri/aderencia";
 
 export type ResultadoAcaoPublica = { sucesso: true } | { sucesso: false; erro: string };
 
@@ -129,6 +135,27 @@ export async function encerrarVinculo(input: unknown): Promise<ResultadoAcaoPubl
   return { sucesso: true };
 }
 
+/**
+ * O cliente abriu a home e viu os recados: marca os não-lidos como lidos,
+ * pro profissional saber que chegou. Idempotente — updateMany só toca nos
+ * que ainda têm lidoEm null.
+ */
+export async function marcarRecadosLidos(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = tokenSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "token inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.recado.updateMany({
+    where: { clienteId: cliente.id, lidoEm: null },
+    data: { lidoEm: new Date() },
+  });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
 /** Peso auto-relatado — vira o gráfico de evolução na visão do profissional. */
 export async function registrarPeso(input: unknown): Promise<ResultadoAcaoPublica> {
   const parsed = registrarPesoSchema.safeParse(input);
@@ -141,6 +168,74 @@ export async function registrarPeso(input: unknown): Promise<ResultadoAcaoPublic
   if (!cliente.consentimentoEm) return { sucesso: false, erro: "consentimento obrigatório antes de registrar" };
 
   await prismaNutri.medida.create({ data: { clienteId: cliente.id, pesoKg: parsed.data.pesoKg } });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Um copo d'água. 1 toque = 1 linha; o total do dia é a soma delas. Sem
+ * dedupe idempotente de propósito: dois toques são dois copos, não um
+ * registro repetido.
+ */
+export async function registrarAgua(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = registrarAguaSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "volume inválido" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+  if (!cliente.consentimentoEm) return { sucesso: false, erro: "consentimento obrigatório antes de registrar" };
+
+  await prismaNutri.registroAgua.create({
+    data: { clienteId: cliente.id, ml: parsed.data.ml ?? COPO_PADRAO_ML },
+  });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Desfaz o último copo de hoje — para o toque errado. Água é métrica
+ * efêmera auto-relatada, não registro clínico, então aqui DELETE é de
+ * verdade (ao contrário de refeição/peso); some da soma e do histórico. O
+ * filtro por clienteId impede apagar o copo de outra pessoa sabendo o id.
+ */
+export async function removerUltimaAgua(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = tokenSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "token inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const { inicio, fim } = limitesDoDiaEmSaoPaulo();
+  const ultimo = await prismaNutri.registroAgua.findFirst({
+    where: { clienteId: cliente.id, registradoEm: { gte: inicio, lt: fim } },
+    orderBy: { registradoEm: "desc" },
+  });
+  if (!ultimo) return { sucesso: false, erro: "nada para desfazer hoje" };
+
+  await prismaNutri.registroAgua.delete({ where: { id: ultimo.id } });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/** Cliente ajusta a própria meta diária de água. */
+export async function definirMetaAgua(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = definirMetaAguaSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "meta inválida" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.cliente.update({
+    where: { id: cliente.id },
+    data: { metaAguaMl: parsed.data.metaMl },
+  });
 
   revalidatePath(`/p/${parsed.data.token}`);
   return { sucesso: true };
@@ -392,6 +487,52 @@ export async function salvarFavorito(input: unknown): Promise<ResultadoAcaoPubli
   }
 
   revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Registra a inscrição de Web Push de um aparelho do cliente. Chave natural
+ * é o endpoint (o navegador dá um por aparelho): upsert por ele evita
+ * duplicar quando o mesmo aparelho reinscreve, e reaponta pro cliente certo
+ * caso o aparelho troque de dono.
+ */
+export async function salvarInscricaoPush(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = inscricaoPushSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "inscrição inválida" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.pushSubscription.upsert({
+    where: { endpoint: parsed.data.endpoint },
+    update: { clienteId: cliente.id, p256dh: parsed.data.p256dh, auth: parsed.data.auth },
+    create: {
+      clienteId: cliente.id,
+      endpoint: parsed.data.endpoint,
+      p256dh: parsed.data.p256dh,
+      auth: parsed.data.auth,
+    },
+  });
+
+  return { sucesso: true };
+}
+
+/** Desliga os lembretes neste aparelho — apaga a inscrição pelo endpoint. */
+export async function removerInscricaoPush(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = removerInscricaoPushSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  // Filtro por clienteId: saber o endpoint de outra pessoa não basta pra
+  // apagar a inscrição dela.
+  await prismaNutri.pushSubscription.deleteMany({
+    where: { endpoint: parsed.data.endpoint, clienteId: cliente.id },
+  });
+
   return { sucesso: true };
 }
 

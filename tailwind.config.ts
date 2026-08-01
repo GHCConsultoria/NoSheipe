@@ -43,6 +43,7 @@ const config: Config = {
         treino: {
           DEFAULT: "var(--color-treino)",
           deep: "var(--color-treino-deep)",
+          on: "var(--color-on-treino)",
         },
       },
       fontFamily: {

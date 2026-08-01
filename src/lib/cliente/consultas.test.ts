@@ -206,4 +206,9 @@ describe("buscarPainelDoCliente", () => {
     expect(resultado.treino?.sessoesHoje).toHaveLength(1);
     expect(resultado.treino?.aderenciaSemana?.diasTreinados).toBe(1);
   });
+
+  it("devolve a hidratação com a meta padrão e zero consumo sem copos", async () => {
+    const resultado = await painel("semVinculo");
+    expect(resultado.hidratacao).toEqual({ consumidoMl: 0, metaMl: 2000, percentual: 0, copoMl: 250 });
+  });
 });

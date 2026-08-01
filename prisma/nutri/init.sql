@@ -380,3 +380,96 @@ ALTER TABLE "refeicoes" ADD COLUMN "macrosPendentes" BOOLEAN NOT NULL DEFAULT fa
 -- A pessoa pode corrigir os macros na mão; esta flag rotula "ajustado por
 -- você" em vez de "estimativa". Idempotente como os ALTERs acima.
 ALTER TABLE "refeicoes" ADD COLUMN "ajustadoManualmente" BOOLEAN NOT NULL DEFAULT false;
+
+
+-- ============================================================
+-- Hidratação (água). Cada toque no copo é uma linha; o total do
+-- dia é uma soma. A meta diária vive no próprio cliente.
+-- ============================================================
+
+-- AlterTable
+-- Meta diária de água, ajustável pelo cliente. ADD COLUMN sem "IF NOT EXISTS"
+-- no SQLite: a segunda passada falha com "duplicate column name", que
+-- aplicar-schema trata como "já aplicado" — idempotente como os ALTERs acima.
+ALTER TABLE "clientes" ADD COLUMN "metaAguaMl" INTEGER NOT NULL DEFAULT 2000;
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "registros_agua" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "ml" INTEGER NOT NULL,
+    "registradoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "registros_agua_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+-- O total do dia filtra por cliente + janela de tempo; o índice serve as duas.
+CREATE INDEX IF NOT EXISTS "registros_agua_clienteId_registradoEm_idx" ON "registros_agua"("clienteId", "registradoEm");
+
+
+-- ============================================================
+-- Recados: mensagem do profissional PARA o cliente (o oposto da
+-- anotação, que é privada). O cliente lê na home.
+-- ============================================================
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "recados" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "profissionalId" TEXT NOT NULL,
+    "texto" TEXT NOT NULL,
+    "lidoEm" DATETIME,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "recados_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "recados_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "profissionais" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "recados_clienteId_idx" ON "recados"("clienteId");
+
+
+-- ============================================================
+-- Templates: dieta/treino "de prateleira" do profissional, pra
+-- reusar em vários clientes. Aplicar só preenche o formulário.
+-- ============================================================
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "templates" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "profissionalId" TEXT NOT NULL,
+    "tipo" TEXT NOT NULL,
+    "nome" TEXT NOT NULL,
+    "metaKcal" INTEGER,
+    "metaProteina" INTEGER,
+    "metaCarbo" INTEGER,
+    "metaGordura" INTEGER,
+    "descricao" TEXT,
+    "diasPorSemana" INTEGER,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "templates_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "profissionais" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "templates_profissionalId_tipo_idx" ON "templates"("profissionalId", "tipo");
+
+
+-- ============================================================
+-- Web Push: uma inscrição por aparelho do cliente. VAPID nas envs.
+-- ============================================================
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "push_subscriptions" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "endpoint" TEXT NOT NULL,
+    "p256dh" TEXT NOT NULL,
+    "auth" TEXT NOT NULL,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "push_subscriptions_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "push_subscriptions_endpoint_key" ON "push_subscriptions"("endpoint");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "push_subscriptions_clienteId_idx" ON "push_subscriptions"("clienteId");

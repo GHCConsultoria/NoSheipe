@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { buscarClientePorToken, buscarPainelDoCliente } from "@/lib/cliente/consultas";
+import { chavePublicaPush } from "@/lib/push/webpush";
 import { ConsentimentoCliente } from "@/components/cliente/ConsentimentoCliente";
 import { HomeDoCliente } from "@/components/cliente/HomeDoCliente";
 
@@ -27,6 +28,10 @@ export default async function PaginaCliente({ params }: { params: { token: strin
       solicitacoesPendentes={painel.solicitacoes.length}
       nutricao={painel.nutricao}
       treino={painel.treino}
+      hidratacao={painel.hidratacao}
+      ofensiva={painel.ofensiva}
+      recados={painel.recados}
+      chavePush={chavePublicaPush()}
     />
   );
 }

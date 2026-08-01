@@ -11,6 +11,7 @@ import {
   type SaldoDoDia,
 } from "@/lib/nutri/aderencia";
 import { calcularAderenciaTreino, estaForaDoTreino, type AderenciaTreino } from "@/lib/personal/aderencia";
+import { comparar, type Comparacao } from "@/lib/profissional/comparacao";
 
 function diasDesde(data: Date | null | undefined): number | null {
   if (!data) return null;
@@ -128,7 +129,10 @@ export interface FichaDoCliente {
   anamneseNutricional: Awaited<ReturnType<typeof prismaNutri.anamneseNutricional.findUnique>>;
   anamneseTreino: Awaited<ReturnType<typeof prismaNutri.anamneseTreino.findUnique>>;
   anotacoes: { id: string; texto: string; criadoEm: Date }[];
+  recados: { id: string; texto: string; criadoEm: Date; lido: boolean }[];
   pesos: { pesoKg: number; registradoEm: Date }[];
+  templatesNutricao: { id: string; nome: string; metaKcal: number; metaProteina: number; metaCarbo: number; metaGordura: number }[];
+  templatesTreino: { id: string; nome: string; descricao: string; diasPorSemana: number }[];
 }
 
 /**
@@ -148,7 +152,8 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
   const acompanhaNutricao = vinculos.some((v) => v.tipo === TipoVinculo.NUTRICAO);
   const acompanhaTreino = vinculos.some((v) => v.tipo === TipoVinculo.TREINO);
 
-  const [plano, treino, anamneseNutricional, anamneseTreino, anotacoes, pesos] = await Promise.all([
+  const [plano, treino, anamneseNutricional, anamneseTreino, anotacoes, recados, pesos, templatesNutricao, templatesTreino] =
+    await Promise.all([
     acompanhaNutricao
       ? prismaNutri.planoNutricional.findFirst({ where: { clienteId, ativo: true }, orderBy: { criadoEm: "desc" } })
       : null,
@@ -160,8 +165,24 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
     // Só as anotações deste profissional: com cliente compartilhado, a
     // observação de um não aparece pro outro.
     prismaNutri.anotacao.findMany({ where: { clienteId, profissionalId }, orderBy: { criadoEm: "desc" } }),
+    // Só os recados que ESTE profissional mandou — o histórico do que ele
+    // enviou, com o status de leitura.
+    prismaNutri.recado.findMany({ where: { clienteId, profissionalId }, orderBy: { criadoEm: "desc" }, take: 20 }),
     // Peso é medida objetiva e serve aos dois lados.
     prismaNutri.medida.findMany({ where: { clienteId }, orderBy: { registradoEm: "asc" }, take: 60 }),
+    // Templates do profissional — só do lado que ele acompanha neste cliente.
+    acompanhaNutricao
+      ? prismaNutri.template.findMany({
+          where: { profissionalId, tipo: TipoVinculo.NUTRICAO },
+          orderBy: { criadoEm: "desc" },
+        })
+      : [],
+    acompanhaTreino
+      ? prismaNutri.template.findMany({
+          where: { profissionalId, tipo: TipoVinculo.TREINO },
+          orderBy: { criadoEm: "desc" },
+        })
+      : [],
   ]);
 
   return {
@@ -180,7 +201,101 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
     anamneseNutricional,
     anamneseTreino,
     anotacoes: anotacoes.map((a) => ({ id: a.id, texto: a.texto, criadoEm: a.criadoEm })),
+    recados: recados.map((r) => ({ id: r.id, texto: r.texto, criadoEm: r.criadoEm, lido: r.lidoEm !== null })),
     pesos: pesos.map((p) => ({ pesoKg: p.pesoKg, registradoEm: p.registradoEm })),
+    templatesNutricao: templatesNutricao.map((t) => ({
+      id: t.id,
+      nome: t.nome,
+      metaKcal: t.metaKcal ?? 0,
+      metaProteina: t.metaProteina ?? 0,
+      metaCarbo: t.metaCarbo ?? 0,
+      metaGordura: t.metaGordura ?? 0,
+    })),
+    templatesTreino: templatesTreino.map((t) => ({
+      id: t.id,
+      nome: t.nome,
+      descricao: t.descricao ?? "",
+      diasPorSemana: t.diasPorSemana ?? 3,
+    })),
+  };
+}
+
+export interface ComparacaoSemanas {
+  /** Comparações de nutrição — null se o profissional não acompanha a dieta. */
+  nutricao: { dias: Comparacao; refeicoes: Comparacao; kcalMedia: Comparacao } | null;
+  /** Comparações de treino — null se ele não acompanha o treino. */
+  treino: { sessoes: Comparacao; dias: Comparacao } | null;
+}
+
+const UMA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Chave yyyy-mm-dd em SP — pra contar dias distintos com registro. */
+const CHAVE_DIA_SP = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
+
+function diasDistintos(datas: Date[]): number {
+  const dias = new Set<string>();
+  for (const d of datas) dias.add(CHAVE_DIA_SP.format(d));
+  return dias.size;
+}
+
+/**
+ * Compara os últimos 7 dias com os 7 anteriores — janelas móveis, e não
+ * semana-calendário, pra não comparar uma segunda-feira recém-começada
+ * contra uma semana inteira. Só devolve o lado que o profissional acompanha.
+ */
+export async function buscarComparacaoSemanas(
+  clienteId: string,
+  acompanhaNutricao: boolean,
+  acompanhaTreino: boolean,
+): Promise<ComparacaoSemanas> {
+  const agora = Date.now();
+  const inicioAtual = new Date(agora - UMA_SEMANA_MS);
+  const inicioAnterior = new Date(agora - 2 * UMA_SEMANA_MS);
+
+  const [nutricao, treino] = await Promise.all([
+    acompanhaNutricao ? compararNutricao(clienteId, inicioAnterior, inicioAtual) : Promise.resolve(null),
+    acompanhaTreino ? compararTreino(clienteId, inicioAnterior, inicioAtual) : Promise.resolve(null),
+  ]);
+
+  return { nutricao, treino };
+}
+
+async function compararNutricao(clienteId: string, inicioAnterior: Date, inicioAtual: Date) {
+  const [anterior, atual] = await Promise.all([
+    prismaNutri.refeicao.findMany({
+      where: { clienteId, registradoEm: { gte: inicioAnterior, lt: inicioAtual } },
+      select: { registradoEm: true, kcal: true },
+    }),
+    prismaNutri.refeicao.findMany({
+      where: { clienteId, registradoEm: { gte: inicioAtual } },
+      select: { registradoEm: true, kcal: true },
+    }),
+  ]);
+
+  const mediaKcal = (rs: { kcal: number }[]) => (rs.length > 0 ? Math.round(rs.reduce((s, r) => s + r.kcal, 0) / rs.length) : 0);
+
+  return {
+    dias: comparar(diasDistintos(atual.map((r) => r.registradoEm)), diasDistintos(anterior.map((r) => r.registradoEm))),
+    refeicoes: comparar(atual.length, anterior.length),
+    kcalMedia: comparar(mediaKcal(atual), mediaKcal(anterior)),
+  };
+}
+
+async function compararTreino(clienteId: string, inicioAnterior: Date, inicioAtual: Date) {
+  const [anterior, atual] = await Promise.all([
+    prismaNutri.sessaoTreino.findMany({
+      where: { clienteId, realizadoEm: { gte: inicioAnterior, lt: inicioAtual } },
+      select: { realizadoEm: true },
+    }),
+    prismaNutri.sessaoTreino.findMany({
+      where: { clienteId, realizadoEm: { gte: inicioAtual } },
+      select: { realizadoEm: true },
+    }),
+  ]);
+
+  return {
+    sessoes: comparar(atual.length, anterior.length),
+    dias: comparar(diasDistintos(atual.map((s) => s.realizadoEm)), diasDistintos(anterior.map((s) => s.realizadoEm))),
   };
 }
 

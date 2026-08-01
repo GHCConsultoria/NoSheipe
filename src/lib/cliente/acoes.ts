@@ -4,6 +4,14 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prismaNutri } from "@/lib/nutri/prisma";
 import { Capacidade, exigirCapacidade, obterProfissionalAtual } from "@/lib/profissional/auth";
+import { buscarComparacaoSemanas } from "@/lib/profissional/consultas";
+import { pushConfigurado, enviarPush } from "@/lib/push/webpush";
+import {
+  gerarRelatorioEvolucao,
+  IaNaoConfiguradaError,
+  IaIndisponivelError,
+  type DadosRelatorio,
+} from "@/lib/profissional/relatorio";
 import {
   StatusCliente,
   StatusVinculo,
@@ -13,11 +21,16 @@ import {
   atualizarTreinoSchema,
   clienteIdSchema,
   criarClienteSchema,
+  recadoSchema,
+  removerTemplateSchema,
   solicitarVinculoSchema,
+  templateNutricaoSchema,
+  templateTreinoSchema,
 } from "@/lib/cliente/schemas";
 
 export type ResultadoAcao = { sucesso: true } | { sucesso: false; erro: string };
 export type ResultadoToken = { sucesso: true; token: string } | { sucesso: false; erro: string };
+export type ResultadoRelatorio = { sucesso: true; texto: string } | { sucesso: false; erro: string };
 /** Devolve o nome pra quem pediu confirmar que digitou o código certo. */
 export type ResultadoSolicitacao = { sucesso: true; nome: string } | { sucesso: false; erro: string };
 
@@ -230,6 +243,73 @@ export async function atualizarMetas(input: unknown): Promise<ResultadoAcao> {
   return { sucesso: true };
 }
 
+/**
+ * Salva as metas atuais como um template reusável do profissional. Exige a
+ * capacidade de nutrição — só quem prescreve dieta guarda template de dieta.
+ */
+export async function salvarTemplateNutricao(input: unknown): Promise<ResultadoAcao> {
+  const parsed = templateNutricaoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+
+  const profissional = await exigirCapacidade(Capacidade.NUTRICAO);
+  await prismaNutri.template.create({
+    data: {
+      profissionalId: profissional.id,
+      tipo: TipoVinculo.NUTRICAO,
+      nome: parsed.data.nome,
+      metaKcal: parsed.data.metas.metaKcal,
+      metaProteina: parsed.data.metas.metaProteina,
+      metaCarbo: parsed.data.metas.metaCarbo,
+      metaGordura: parsed.data.metas.metaGordura,
+    },
+  });
+
+  revalidatePath("/pro", "layout");
+  return { sucesso: true };
+}
+
+/** Salva o treino atual como template reusável do profissional. */
+export async function salvarTemplateTreino(input: unknown): Promise<ResultadoAcao> {
+  const parsed = templateTreinoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+
+  const profissional = await exigirCapacidade(Capacidade.TREINO);
+  await prismaNutri.template.create({
+    data: {
+      profissionalId: profissional.id,
+      tipo: TipoVinculo.TREINO,
+      nome: parsed.data.nome,
+      descricao: parsed.data.treino.descricao,
+      diasPorSemana: parsed.data.treino.diasPorSemana,
+    },
+  });
+
+  revalidatePath("/pro", "layout");
+  return { sucesso: true };
+}
+
+/**
+ * Remove um template. Só toca nos do próprio profissional — o filtro por
+ * profissionalId impede apagar template alheio sabendo o id. Template é
+ * conveniência, não registro de negócio: aqui DELETE é de verdade.
+ */
+export async function removerTemplate(input: unknown): Promise<ResultadoAcao> {
+  const parsed = removerTemplateSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const profissional = await obterProfissionalAtual();
+  await prismaNutri.template.deleteMany({
+    where: { id: parsed.data.templateId, profissionalId: profissional.id },
+  });
+
+  revalidatePath("/pro", "layout");
+  return { sucesso: true };
+}
+
 /** Novo treino ativo; o anterior fica como histórico. */
 export async function atualizarTreino(input: unknown): Promise<ResultadoAcao> {
   const parsed = atualizarTreinoSchema.safeParse(input);
@@ -336,4 +416,137 @@ export async function adicionarAnotacao(input: unknown): Promise<ResultadoAcao> 
 
   revalidatePath(`/pro/clientes/${parsed.data.clienteId}`);
   return { sucesso: true };
+}
+
+/**
+ * Recado do profissional PARA o cliente — aparece na home dele. Exige
+ * vínculo ativo (qualquer tipo): sem acompanhar, não há a quem mandar
+ * recado. Guarda profissionalId pro cliente ver quem falou e pro
+ * profissional acompanhar se foi lido.
+ */
+export async function enviarRecado(input: unknown): Promise<ResultadoAcao> {
+  const parsed = recadoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+
+  const profissional = await obterProfissionalAtual();
+  const vinculo = await prismaNutri.vinculo.findFirst({
+    where: { clienteId: parsed.data.clienteId, profissionalId: profissional.id, status: StatusVinculo.ATIVO },
+  });
+  if (!vinculo) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const cliente = await prismaNutri.cliente.findUnique({ where: { id: parsed.data.clienteId } });
+
+  await prismaNutri.recado.create({
+    data: { clienteId: parsed.data.clienteId, profissionalId: profissional.id, texto: parsed.data.texto },
+  });
+
+  revalidatePath(`/pro/clientes/${parsed.data.clienteId}`);
+  if (cliente) revalidatePath(`/p/${cliente.tokenAcesso}`);
+  return { sucesso: true };
+}
+
+/**
+ * "Cutucar": manda um lembrete push pro cliente sumido. Exige vínculo ativo.
+ * Envia pra todos os aparelhos dele e limpa as inscrições que o navegador
+ * reportar mortas. Degrada com mensagem clara quando o push não está
+ * configurado (faltam chaves VAPID) ou quando o cliente não ativou lembretes.
+ */
+export async function cutucarCliente(input: unknown): Promise<ResultadoAcao> {
+  const parsed = clienteIdSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const profissional = await obterProfissionalAtual();
+  const vinculo = await prismaNutri.vinculo.findFirst({
+    where: { clienteId: parsed.data.clienteId, profissionalId: profissional.id, status: StatusVinculo.ATIVO },
+  });
+  if (!vinculo) return { sucesso: false, erro: "cliente não encontrado" };
+
+  if (!pushConfigurado()) {
+    return { sucesso: false, erro: "lembretes push não configurados no servidor (faltam as chaves VAPID)" };
+  }
+
+  const cliente = await prismaNutri.cliente.findUnique({ where: { id: parsed.data.clienteId } });
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const inscricoes = await prismaNutri.pushSubscription.findMany({ where: { clienteId: cliente.id } });
+  if (inscricoes.length === 0) {
+    return { sucesso: false, erro: "esse cliente ainda não ativou os lembretes no aparelho dele" };
+  }
+
+  const payload = {
+    titulo: "Lembrete do seu profissional",
+    corpo: `${profissional.nome} passou pra lembrar: que tal registrar hoje?`,
+    url: `/p/${cliente.tokenAcesso}`,
+  };
+
+  const resultados = await Promise.all(inscricoes.map((i) => enviarPush(i, payload)));
+
+  // Limpa as que morreram (aparelho desinstalou o PWA) — não é dado de negócio.
+  const expiradas = inscricoes.filter((_, idx) => resultados[idx] === "expirado").map((i) => i.id);
+  if (expiradas.length > 0) {
+    await prismaNutri.pushSubscription.deleteMany({ where: { id: { in: expiradas } } });
+  }
+
+  if (!resultados.includes("ok")) {
+    return { sucesso: false, erro: "não consegui entregar o lembrete agora — tente de novo em instantes" };
+  }
+
+  return { sucesso: true };
+}
+
+/**
+ * Resumo de evolução gerado por IA a partir dos números do cliente (peso e
+ * comparativo de semanas). Não persiste nada: é uma ajuda de redação pro
+ * profissional, que lê e decide. Só usa os lados que ele acompanha, e a IA
+ * é instruída a não inventar — se a IA está fora, devolve erro tratado.
+ */
+export async function gerarRelatorio(input: unknown): Promise<ResultadoRelatorio> {
+  const parsed = clienteIdSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const profissional = await obterProfissionalAtual();
+  const vinculos = await prismaNutri.vinculo.findMany({
+    where: { clienteId: parsed.data.clienteId, profissionalId: profissional.id, status: StatusVinculo.ATIVO },
+  });
+  if (vinculos.length === 0) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const acompanhaNutricao = vinculos.some((v) => v.tipo === TipoVinculo.NUTRICAO);
+  const acompanhaTreino = vinculos.some((v) => v.tipo === TipoVinculo.TREINO);
+
+  const cliente = await prismaNutri.cliente.findUnique({ where: { id: parsed.data.clienteId } });
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const [medidas, comparacao] = await Promise.all([
+    prismaNutri.medida.findMany({ where: { clienteId: cliente.id }, orderBy: { registradoEm: "asc" } }),
+    buscarComparacaoSemanas(cliente.id, acompanhaNutricao, acompanhaTreino),
+  ]);
+
+  const peso =
+    medidas.length >= 2
+      ? {
+          primeiro: medidas[0].pesoKg,
+          ultimo: medidas[medidas.length - 1].pesoKg,
+          dias: Math.max(
+            1,
+            Math.round((medidas[medidas.length - 1].registradoEm.getTime() - medidas[0].registradoEm.getTime()) / 86_400_000),
+          ),
+        }
+      : null;
+
+  const dados: DadosRelatorio = { nome: cliente.nome, objetivo: cliente.objetivo, peso, comparacao };
+
+  try {
+    const texto = await gerarRelatorioEvolucao(dados);
+    return { sucesso: true, texto };
+  } catch (erro) {
+    if (erro instanceof IaNaoConfiguradaError) {
+      return { sucesso: false, erro: "a IA de relatório não está configurada — configure a chave nas variáveis de ambiente" };
+    }
+    if (erro instanceof IaIndisponivelError) {
+      return { sucesso: false, erro: "a IA está indisponível agora — tente de novo em instantes" };
+    }
+    return { sucesso: false, erro: "não deu pra gerar o relatório agora" };
+  }
 }
