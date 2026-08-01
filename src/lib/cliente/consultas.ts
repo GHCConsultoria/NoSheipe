@@ -78,6 +78,14 @@ export interface BlocoTreino {
   sessoesHoje: { id: string; entradaBruta: string; horario: string }[];
 }
 
+export interface RecadoDoCliente {
+  id: string;
+  texto: string;
+  profissionalNome: string;
+  quando: string;
+  lido: boolean;
+}
+
 export interface PainelDoCliente {
   cliente: Cliente;
   /** null quando o cliente não tem nutricionista — o bloco nem aparece. */
@@ -88,6 +96,8 @@ export interface PainelDoCliente {
   hidratacao: Hidratacao;
   /** Ofensiva: dias seguidos com registro — independe de vínculo. */
   ofensiva: Ofensiva;
+  /** Recados que os profissionais mandaram — mais recentes primeiro. */
+  recados: RecadoDoCliente[];
   /** Quem acompanha hoje — o cliente pode encerrar qualquer um. */
   vinculosAtivos: VinculoDoCliente[];
   /** Profissionais que pediram acesso e aguardam a resposta dele. */
@@ -141,6 +151,24 @@ async function montarOfensiva(clienteId: string): Promise<Ofensiva> {
   return calcularOfensiva(dias, CHAVE_DIA_SP.format(new Date()));
 }
 
+/** Recados que os profissionais mandaram pro cliente, mais recentes primeiro. */
+async function montarRecados(clienteId: string): Promise<RecadoDoCliente[]> {
+  const recados = await prismaNutri.recado.findMany({
+    where: { clienteId },
+    include: { profissional: { select: { nome: true } } },
+    orderBy: { criadoEm: "desc" },
+    take: 20,
+  });
+
+  return recados.map((r) => ({
+    id: r.id,
+    texto: r.texto,
+    profissionalNome: r.profissional.nome,
+    quando: FORMATADOR_DATA_CURTA.format(r.criadoEm),
+    lido: r.lidoEm !== null,
+  }));
+}
+
 /**
  * Tudo que a home do cliente precisa, numa consulta só: o progresso do dia
  * em dieta e em treino lado a lado.
@@ -153,7 +181,7 @@ export async function buscarPainelDoCliente(cliente: Cliente): Promise<PainelDoC
   const { ativos, pendentes, temNutricao, temTreino } = await vinculosVivos(cliente.id);
   const { inicio: inicioHoje, fim: fimHoje } = limitesDoDiaEmSaoPaulo();
 
-  const [nutricao, treino, aguaHoje, ofensiva] = await Promise.all([
+  const [nutricao, treino, aguaHoje, ofensiva, recados] = await Promise.all([
     temNutricao ? montarBlocoNutricao(cliente.id, inicioHoje, fimHoje) : Promise.resolve(null),
     temTreino ? montarBlocoTreino(cliente.id, inicioHoje, fimHoje) : Promise.resolve(null),
     prismaNutri.registroAgua.findMany({
@@ -161,11 +189,21 @@ export async function buscarPainelDoCliente(cliente: Cliente): Promise<PainelDoC
       select: { ml: true },
     }),
     montarOfensiva(cliente.id),
+    montarRecados(cliente.id),
   ]);
 
   const hidratacao = calcularHidratacao(aguaHoje, cliente.metaAguaMl);
 
-  return { cliente, nutricao, treino, hidratacao, ofensiva, vinculosAtivos: ativos, solicitacoes: pendentes };
+  return {
+    cliente,
+    nutricao,
+    treino,
+    hidratacao,
+    ofensiva,
+    recados,
+    vinculosAtivos: ativos,
+    solicitacoes: pendentes,
+  };
 }
 
 async function montarBlocoNutricao(clienteId: string, inicioHoje: Date, fimHoje: Date): Promise<BlocoNutricao> {

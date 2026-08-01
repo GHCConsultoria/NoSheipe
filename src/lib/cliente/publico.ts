@@ -133,6 +133,27 @@ export async function encerrarVinculo(input: unknown): Promise<ResultadoAcaoPubl
   return { sucesso: true };
 }
 
+/**
+ * O cliente abriu a home e viu os recados: marca os não-lidos como lidos,
+ * pro profissional saber que chegou. Idempotente — updateMany só toca nos
+ * que ainda têm lidoEm null.
+ */
+export async function marcarRecadosLidos(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = tokenSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "token inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.recado.updateMany({
+    where: { clienteId: cliente.id, lidoEm: null },
+    data: { lidoEm: new Date() },
+  });
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
 /** Peso auto-relatado — vira o gráfico de evolução na visão do profissional. */
 export async function registrarPeso(input: unknown): Promise<ResultadoAcaoPublica> {
   const parsed = registrarPesoSchema.safeParse(input);

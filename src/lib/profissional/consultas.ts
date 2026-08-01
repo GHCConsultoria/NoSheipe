@@ -128,6 +128,7 @@ export interface FichaDoCliente {
   anamneseNutricional: Awaited<ReturnType<typeof prismaNutri.anamneseNutricional.findUnique>>;
   anamneseTreino: Awaited<ReturnType<typeof prismaNutri.anamneseTreino.findUnique>>;
   anotacoes: { id: string; texto: string; criadoEm: Date }[];
+  recados: { id: string; texto: string; criadoEm: Date; lido: boolean }[];
   pesos: { pesoKg: number; registradoEm: Date }[];
 }
 
@@ -148,7 +149,7 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
   const acompanhaNutricao = vinculos.some((v) => v.tipo === TipoVinculo.NUTRICAO);
   const acompanhaTreino = vinculos.some((v) => v.tipo === TipoVinculo.TREINO);
 
-  const [plano, treino, anamneseNutricional, anamneseTreino, anotacoes, pesos] = await Promise.all([
+  const [plano, treino, anamneseNutricional, anamneseTreino, anotacoes, recados, pesos] = await Promise.all([
     acompanhaNutricao
       ? prismaNutri.planoNutricional.findFirst({ where: { clienteId, ativo: true }, orderBy: { criadoEm: "desc" } })
       : null,
@@ -160,6 +161,9 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
     // Só as anotações deste profissional: com cliente compartilhado, a
     // observação de um não aparece pro outro.
     prismaNutri.anotacao.findMany({ where: { clienteId, profissionalId }, orderBy: { criadoEm: "desc" } }),
+    // Só os recados que ESTE profissional mandou — o histórico do que ele
+    // enviou, com o status de leitura.
+    prismaNutri.recado.findMany({ where: { clienteId, profissionalId }, orderBy: { criadoEm: "desc" }, take: 20 }),
     // Peso é medida objetiva e serve aos dois lados.
     prismaNutri.medida.findMany({ where: { clienteId }, orderBy: { registradoEm: "asc" }, take: 60 }),
   ]);
@@ -180,6 +184,7 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
     anamneseNutricional,
     anamneseTreino,
     anotacoes: anotacoes.map((a) => ({ id: a.id, texto: a.texto, criadoEm: a.criadoEm })),
+    recados: recados.map((r) => ({ id: r.id, texto: r.texto, criadoEm: r.criadoEm, lido: r.lidoEm !== null })),
     pesos: pesos.map((p) => ({ pesoKg: p.pesoKg, registradoEm: p.registradoEm })),
   };
 }

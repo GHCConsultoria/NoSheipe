@@ -2,7 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { adicionarAnotacao, arquivarCliente, atualizarMetas, atualizarTreino, regenerarToken } from "@/lib/cliente/acoes";
+import {
+  adicionarAnotacao,
+  arquivarCliente,
+  atualizarMetas,
+  atualizarTreino,
+  enviarRecado,
+  regenerarToken,
+} from "@/lib/cliente/acoes";
 import { GraficoLinha } from "@/components/shared/GraficoLinha";
 
 interface Props {
@@ -14,6 +21,7 @@ interface Props {
   metasIniciais: { metaKcal: number; metaProteina: number; metaCarbo: number; metaGordura: number } | null;
   treinoInicial: { nome: string; descricao: string; diasPorSemana: number } | null;
   anotacoes: { id: string; texto: string; criadoEm: string }[];
+  recados: { id: string; texto: string; criadoEm: string; lido: boolean }[];
   pesos: { valor: number; rotulo: string }[];
 }
 
@@ -26,6 +34,7 @@ export function EditorCliente({
   metasIniciais,
   treinoInicial,
   anotacoes,
+  recados,
   pesos,
 }: Props) {
   const router = useRouter();
@@ -47,6 +56,7 @@ export function EditorCliente({
     diasPorSemana: String(treinoInicial?.diasPorSemana ?? 3),
   });
   const [novaAnotacao, setNovaAnotacao] = useState("");
+  const [novoRecado, setNovoRecado] = useState("");
 
   useEffect(() => {
     setOrigem(window.location.origin);
@@ -204,6 +214,46 @@ export function EditorCliente({
           <GraficoLinha pontos={pesos} sufixo=" kg" />
         </section>
       )}
+
+      <section className="paper-card flex flex-col gap-4 rounded-sm p-6">
+        <h2 className="eyebrow">Recado pro cliente</h2>
+        <p className="-mt-2 text-xs text-ink-faint">Aparece na home do cliente — ele vê quem mandou.</p>
+        <textarea
+          rows={2}
+          value={novoRecado}
+          onChange={(e) => setNovoRecado(e.target.value)}
+          placeholder="Ex.: caprichou essa semana, bora manter!"
+          className="w-full rounded-sm border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-sheipe"
+        />
+        <div>
+          <button
+            type="button"
+            disabled={pendente || !novoRecado.trim()}
+            onClick={() =>
+              executar(async () => {
+                const r = await enviarRecado({ clienteId, texto: novoRecado });
+                if (r.sucesso) setNovoRecado("");
+                return r;
+              }, "Recado enviado.")
+            }
+            className="tatil rounded-sm bg-sheipe px-4 py-2 text-sm font-medium text-sheipe-on shadow-sm transition-colors hover:bg-sheipe-deep disabled:opacity-50"
+          >
+            Enviar recado
+          </button>
+        </div>
+        {recados.length > 0 && (
+          <ul className="flex flex-col gap-3">
+            {recados.map((r) => (
+              <li key={r.id} className="rounded-sm border border-rule p-3">
+                <p className="text-sm">{r.texto}</p>
+                <p className="mt-1 text-xs text-ink-faint">
+                  {r.criadoEm} · {r.lido ? "lido" : "não lido"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="paper-card flex flex-col gap-4 rounded-sm p-6">
         <h2 className="eyebrow">Anotações</h2>

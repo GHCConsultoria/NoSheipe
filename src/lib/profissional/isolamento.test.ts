@@ -105,6 +105,14 @@ beforeAll(async () => {
   await prismaNutri.anotacao.create({
     data: { clienteId: marina.id, profissionalId: ids.bruno, texto: "evoluiu na carga do agachamento" },
   });
+
+  // Recados dos dois lados — cada um vê só o seu histórico na ficha.
+  await prismaNutri.recado.create({
+    data: { clienteId: marina.id, profissionalId: ids.ana, texto: "bora caprichar no café da manhã" },
+  });
+  await prismaNutri.recado.create({
+    data: { clienteId: marina.id, profissionalId: ids.bruno, texto: "não esquece o alongamento" },
+  });
 }, 60_000);
 
 afterAll(async () => {
@@ -136,6 +144,14 @@ describe("isolamento entre profissionais do mesmo cliente", () => {
 
     expect(daAna?.anotacoes.map((a) => a.texto)).toEqual(["reclamou de fome à noite"]);
     expect(doBruno?.anotacoes.map((a) => a.texto)).toEqual(["evoluiu na carga do agachamento"]);
+  });
+
+  it("cada um vê só os próprios recados enviados", async () => {
+    const daAna = await buscarFichaDoCliente(ids.marina, ids.ana);
+    const doBruno = await buscarFichaDoCliente(ids.marina, ids.bruno);
+
+    expect(daAna?.recados.map((r) => r.texto)).toEqual(["bora caprichar no café da manhã"]);
+    expect(doBruno?.recados.map((r) => r.texto)).toEqual(["não esquece o alongamento"]);
   });
 
   it("profissional sem vínculo não abre a ficha nem sabendo o id", async () => {

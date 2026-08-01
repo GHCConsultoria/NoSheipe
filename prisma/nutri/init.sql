@@ -405,3 +405,24 @@ CREATE TABLE IF NOT EXISTS "registros_agua" (
 -- CreateIndex
 -- O total do dia filtra por cliente + janela de tempo; o índice serve as duas.
 CREATE INDEX IF NOT EXISTS "registros_agua_clienteId_registradoEm_idx" ON "registros_agua"("clienteId", "registradoEm");
+
+
+-- ============================================================
+-- Recados: mensagem do profissional PARA o cliente (o oposto da
+-- anotação, que é privada). O cliente lê na home.
+-- ============================================================
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "recados" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "profissionalId" TEXT NOT NULL,
+    "texto" TEXT NOT NULL,
+    "lidoEm" DATETIME,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "recados_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "recados_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "profissionais" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "recados_clienteId_idx" ON "recados"("clienteId");

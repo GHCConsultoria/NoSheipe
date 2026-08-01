@@ -93,6 +93,12 @@ export default async function FichaCliente({ params }: { params: { id: string } 
             texto: a.texto,
             criadoEm: FORMATADOR_DATA.format(a.criadoEm),
           }))}
+          recados={ficha.recados.map((r) => ({
+            id: r.id,
+            texto: r.texto,
+            criadoEm: FORMATADOR_DATA.format(r.criadoEm),
+            lido: r.lido,
+          }))}
           pesos={ficha.pesos.map((p) => ({
             valor: p.pesoKg,
             rotulo: FORMATADOR_DIA.format(p.registradoEm),

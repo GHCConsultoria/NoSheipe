@@ -13,6 +13,7 @@ import {
   atualizarTreinoSchema,
   clienteIdSchema,
   criarClienteSchema,
+  recadoSchema,
   solicitarVinculoSchema,
 } from "@/lib/cliente/schemas";
 
@@ -335,5 +336,34 @@ export async function adicionarAnotacao(input: unknown): Promise<ResultadoAcao> 
   });
 
   revalidatePath(`/pro/clientes/${parsed.data.clienteId}`);
+  return { sucesso: true };
+}
+
+/**
+ * Recado do profissional PARA o cliente — aparece na home dele. Exige
+ * vínculo ativo (qualquer tipo): sem acompanhar, não há a quem mandar
+ * recado. Guarda profissionalId pro cliente ver quem falou e pro
+ * profissional acompanhar se foi lido.
+ */
+export async function enviarRecado(input: unknown): Promise<ResultadoAcao> {
+  const parsed = recadoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+
+  const profissional = await obterProfissionalAtual();
+  const vinculo = await prismaNutri.vinculo.findFirst({
+    where: { clienteId: parsed.data.clienteId, profissionalId: profissional.id, status: StatusVinculo.ATIVO },
+  });
+  if (!vinculo) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const cliente = await prismaNutri.cliente.findUnique({ where: { id: parsed.data.clienteId } });
+
+  await prismaNutri.recado.create({
+    data: { clienteId: parsed.data.clienteId, profissionalId: profissional.id, texto: parsed.data.texto },
+  });
+
+  revalidatePath(`/pro/clientes/${parsed.data.clienteId}`);
+  if (cliente) revalidatePath(`/p/${cliente.tokenAcesso}`);
   return { sucesso: true };
 }

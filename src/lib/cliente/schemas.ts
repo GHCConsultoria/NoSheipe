@@ -134,6 +134,11 @@ export const anotacaoSchema = clienteIdSchema.extend({
   texto: z.string().trim().min(1, "escreva alguma coisa"),
 });
 
+/** Recado do profissional pro cliente — texto com teto pra não virar dissertação. */
+export const recadoSchema = clienteIdSchema.extend({
+  texto: z.string().trim().min(1, "escreva o recado").max(1000, "recado longo demais"),
+});
+
 export const tokenSchema = z.object({ token: z.string().min(1) });
 
 export const registrarPesoSchema = tokenSchema.extend({

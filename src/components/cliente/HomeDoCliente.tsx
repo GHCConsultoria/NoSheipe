@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Droplet, Flame, Mic, Plus, Square, Undo2, X } from "lucide-react";
+import { Droplet, Flame, MessageCircle, Mic, Plus, Square, Undo2, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
@@ -12,6 +12,7 @@ import {
   ajustarRefeicao,
   definirMetaAgua,
   estimarRefeicao,
+  marcarRecadosLidos,
   registrarAgua,
   registrarPeso,
   removerFavorito,
@@ -57,6 +58,7 @@ interface Props {
   } | null;
   hidratacao: { consumidoMl: number; metaMl: number; percentual: number; copoMl: number };
   ofensiva: { dias: number; ativaHoje: boolean };
+  recados: { id: string; texto: string; profissionalNome: string; quando: string; lido: boolean }[];
 }
 
 /**
@@ -67,7 +69,16 @@ interface Props {
  * Cada bloco só aparece se existir o profissional correspondente — quem só
  * tem nutricionista nunca vê nada de treino.
  */
-export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, treino, hidratacao, ofensiva }: Props) {
+export function HomeDoCliente({
+  token,
+  nome,
+  solicitacoesPendentes,
+  nutricao,
+  treino,
+  hidratacao,
+  ofensiva,
+  recados,
+}: Props) {
   const semAcompanhamento = !nutricao && !treino;
 
   return (
@@ -98,6 +109,8 @@ export function HomeDoCliente({ token, nome, solicitacoesPendentes, nutricao, tr
           </section>
 
           {ofensiva.dias > 0 && <Ofensiva ofensiva={ofensiva} />}
+
+          {recados.length > 0 && <BlocoRecados token={token} recados={recados} />}
 
           {treino && !treino.aderenciaSemana && (
             <p className="mt-4 text-center text-sm text-attention">Seu personal ainda não prescreveu um treino.</p>
@@ -446,6 +459,46 @@ function BlocoRefeicao({
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/**
+ * Recados do profissional. Ao abrir a home, os não-lidos viram lidos — o
+ * profissional passa a ver que chegaram. É efeito de visualização, então
+ * roda uma vez no mount e não mexe na tela (sem refresh, pra não piscar).
+ */
+function BlocoRecados({
+  token,
+  recados,
+}: {
+  token: string;
+  recados: NonNullable<Props["recados"]>;
+}) {
+  const temNaoLido = recados.some((r) => !r.lido);
+
+  useEffect(() => {
+    if (temNaoLido) void marcarRecadosLidos({ token });
+  }, [token, temNaoLido]);
+
+  return (
+    <section className="mt-6">
+      <h2 className="eyebrow mb-3 flex items-center gap-1.5">
+        <MessageCircle size={13} strokeWidth={1.75} /> Recados do seu time
+      </h2>
+      <ul className="flex flex-col gap-3">
+        {recados.map((r) => (
+          <li
+            key={r.id}
+            className={`paper-card rounded-sm p-4 ${!r.lido ? "border-l-2 border-l-sheipe" : ""}`}
+          >
+            <p className="text-sm">{r.texto}</p>
+            <p className="mt-1.5 text-xs text-ink-faint">
+              {r.profissionalNome} · {r.quando}
+            </p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
