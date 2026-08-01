@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Mic, Square, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
@@ -157,9 +157,6 @@ function BlocoRefeicao({
   const [pendente, iniciarTransicao] = useTransition();
   const [falaDisponivel, setFalaDisponivel] = useState(false);
   const { gravando, erro: erroFala, iniciar, parar } = useReconhecimentoDeFala();
-  // O "+" da barra aponta pra #registrar; ao chegar com essa âncora, foca o
-  // campo pra a pessoa já digitar.
-  const campoRef = useRef<HTMLTextAreaElement>(null);
 
   // Ajuste manual dos macros: qual refeição está em edição e o rascunho dos
   // campos (string, porque vêm de <input>).
@@ -190,11 +187,6 @@ function BlocoRefeicao({
   }
 
   useEffect(() => setFalaDisponivel(reconhecimentoDeFalaDisponivel()), []);
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.location.hash === "#registrar") {
-      campoRef.current?.focus({ preventScroll: true });
-    }
-  }, []);
 
   function registrar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -253,7 +245,6 @@ function BlocoRefeicao({
 
       <form onSubmit={registrar} className="paper-card flex flex-col gap-3 rounded-sm p-4">
         <textarea
-          ref={campoRef}
           value={texto}
           onChange={(e) => {
             setTexto(e.target.value);
