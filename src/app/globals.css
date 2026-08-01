@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * No iOS, focar um campo com fonte < 16px faz o Safari dar zoom sozinho na
+ * página — e não desfaz. Forçar 16px nos campos em telas de celular evita
+ * isso sem mexer no tamanho visual do resto. Em tela larga volta ao normal.
+ */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 :root {
   --color-paper: #0a0b0d;
   --color-paper-raised: #131519;
