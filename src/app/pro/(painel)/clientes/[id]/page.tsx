@@ -2,8 +2,9 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { obterProfissionalAtual } from "@/lib/profissional/auth";
-import { buscarFichaDoCliente } from "@/lib/profissional/consultas";
+import { buscarComparacaoSemanas, buscarFichaDoCliente } from "@/lib/profissional/consultas";
 import { EditorCliente } from "@/components/cliente/EditorCliente";
+import { ComparativoSemanas } from "@/components/profissional/ComparativoSemanas";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 
 const FORMATADOR_DATA = new Intl.DateTimeFormat("pt-BR", {
@@ -34,6 +35,8 @@ export default async function FichaCliente({ params }: { params: { id: string } 
   if (!ficha) {
     notFound();
   }
+
+  const comparacao = await buscarComparacaoSemanas(params.id, ficha.acompanhaNutricao, ficha.acompanhaTreino);
 
   const { cliente } = ficha;
   const detalhes = [
@@ -78,6 +81,8 @@ export default async function FichaCliente({ params }: { params: { id: string } 
           )}
         </section>
       )}
+
+      <ComparativoSemanas comparacao={comparacao} />
 
       <div className="mt-6">
         <EditorCliente
