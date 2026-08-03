@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Camera, MessageCircle, Mic, Square, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
-import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
-import { AvatarCliente } from "@/components/cliente/AvatarCliente";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
-import { GraficoLinha } from "@/components/shared/GraficoLinha";
 import {
   ajustarRefeicao,
   estimarRefeicao,
@@ -20,6 +17,8 @@ import {
 } from "@/lib/cliente/publico";
 import { AnelDoDia } from "@/components/cliente/AnelDoDia";
 import { ChamaDaSemana, LegendasDoDia, MacrosDoDia } from "@/components/cliente/PainelDoDia";
+import { GraficoPeso } from "@/components/cliente/GraficoPeso";
+import { FoguinhoFlutuante } from "@/components/cliente/FoguinhoFlutuante";
 import { GerenciarPush } from "@/components/cliente/GerenciarPush";
 
 interface SaldoMacro {
@@ -72,7 +71,7 @@ interface Props {
     }[];
     favoritos: { id: string; descricao: string }[];
     ultimoPesoKg: number | null;
-    pesoSerie: { valor: number; rotulo: string }[];
+    pesoSerie: { valor: number; rotulo: string; iso: string }[];
   } | null;
   treino: {
     treino: { nome: string; descricao: string; diasPorSemana: number } | null;
@@ -85,8 +84,6 @@ interface Props {
   recados: { id: string; texto: string; profissionalNome: string; quando: string; lido: boolean }[];
   /** Chave pública VAPID pro opt-in de lembretes; null se o push não está configurado. */
   chavePush: string | null;
-  /** Foto de perfil (data URL) pro header; null = inicial. */
-  fotoUrl: string | null;
 }
 
 /**
@@ -108,20 +105,13 @@ export function HomeDoCliente({
   semana,
   recados,
   chavePush,
-  fotoUrl,
 }: Props) {
   const semAcompanhamento = !nutricao && !treino;
   const primeiroNome = nome.trim().split(/\s+/)[0];
   const semanasSeguidas = Math.floor(ofensiva.dias / 7);
 
   return (
-    <main className="mx-auto max-w-md px-6 py-10">
-      <header className="mb-5 flex items-center justify-between">
-        <NoSheipeLogo size={22} />
-        <Link href={`/p/${token}/perfil`} aria-label="Meu perfil" className="tatil">
-          <AvatarCliente fotoUrl={fotoUrl} nome={nome} tamanho={36} className="shadow-sm" />
-        </Link>
-      </header>
+    <main className="mx-auto max-w-md px-6 pb-10 pt-6">
       <div className="flex items-baseline justify-between gap-3">
         <h1 className="font-display text-2xl">Olá, {primeiroNome}!</h1>
         {semanasSeguidas >= 1 && (
@@ -213,6 +203,7 @@ export function HomeDoCliente({
             <BlocoPeso token={token} ultimoPesoKg={nutricao.ultimoPesoKg} pesoSerie={nutricao.pesoSerie} />
           )}
 
+          <FoguinhoFlutuante />
         </>
       )}
     </main>
@@ -626,7 +617,7 @@ function BlocoPeso({
 }: {
   token: string;
   ultimoPesoKg: number | null;
-  pesoSerie: { valor: number; rotulo: string }[];
+  pesoSerie: { valor: number; rotulo: string; iso: string }[];
 }) {
   const router = useRouter();
   const [peso, setPeso] = useState("");
@@ -636,14 +627,14 @@ function BlocoPeso({
   return (
     <section className="paper-card mt-8 rounded-sm p-4">
       <div className="flex items-baseline justify-between">
-        <h2 className="eyebrow">Peso</h2>
+        <h2 className="eyebrow">Evolução corporal</h2>
         {ultimoPesoKg !== null && <span className="text-xs text-ink-faint">último: {ultimoPesoKg} kg</span>}
       </div>
 
-      {/* GraficoLinha só desenha com 2+ pontos; some sozinho no começo. */}
+      {/* O gráfico só desenha com 2+ pontos no período; some sozinho no começo. */}
       {pesoSerie.length >= 2 && (
         <div className="mt-3">
-          <GraficoLinha pontos={pesoSerie} sufixo=" kg" />
+          <GraficoPeso pontos={pesoSerie} />
         </div>
       )}
       <form

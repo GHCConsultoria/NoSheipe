@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { buscarClientePorToken, buscarResumoDaNavegacao } from "@/lib/cliente/consultas";
 import { NavRodape } from "@/components/cliente/NavRodape";
-import { CabecalhoCliente } from "@/components/cliente/CabecalhoCliente";
+import { HeaderCliente } from "@/components/cliente/HeaderCliente";
 
 export const dynamic = "force-dynamic";
 
@@ -47,14 +47,8 @@ export default async function LayoutDoCliente({
 
   return (
     <>
-      {/* Atalho pro perfil no canto — só aparece no Marketplace (as outras
-          telas têm a faixa de identidade). */}
-      <CabecalhoCliente
-        token={params.token}
-        nome={cliente.nome}
-        fotoUrl={cliente.fotoBase64}
-        pendentes={pendentes}
-      />
+      {/* Header fixo (marca + foto) no topo de todas as telas do cliente. */}
+      <HeaderCliente token={params.token} nome={cliente.nome} fotoUrl={cliente.fotoBase64} pendentes={pendentes} />
       {/* pb-24 reserva a altura da barra fixa; sem isso ela cobre o fim da
           página, que é justo onde ficam os botões de registrar. */}
       <div className="entrada-aba pb-24">{children}</div>

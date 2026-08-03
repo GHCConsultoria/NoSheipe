@@ -68,8 +68,8 @@ export interface BlocoNutricao {
   }[];
   favoritos: { id: string; descricao: string }[];
   ultimoPesoKg: number | null;
-  /** Série de peso pro gráfico de evolução (ordem cronológica). */
-  pesoSerie: { valor: number; rotulo: string }[];
+  /** Série de peso pro gráfico (cronológica); `iso` deixa a UI filtrar por período. */
+  pesoSerie: { valor: number; rotulo: string; iso: string }[];
 }
 
 export interface BlocoTreino {
@@ -252,9 +252,10 @@ export async function buscarPainelDoCliente(cliente: Cliente): Promise<PainelDoC
 }
 
 async function montarBlocoNutricao(clienteId: string, inicioHoje: Date, fimHoje: Date): Promise<BlocoNutricao> {
-  // Série de peso dos últimos 90 dias, cronológica — vira o gráfico e a
-  // última medida (o topo da série), sem uma segunda consulta só pro "último".
-  const desdePeso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  // Série de peso longa (até ~2 anos), cronológica — o gráfico filtra por
+  // período no cliente (dia/semana/mês/6M/tudo) e daqui sai também a última
+  // medida (o topo da série), sem uma segunda consulta só pro "último".
+  const desdePeso = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000);
 
   const [plano, refeicoes, favoritos, medidas] = await Promise.all([
     prismaNutri.planoNutricional.findFirst({ where: { clienteId, ativo: true }, orderBy: { criadoEm: "desc" } }),
@@ -266,10 +267,15 @@ async function montarBlocoNutricao(clienteId: string, inicioHoje: Date, fimHoje:
     prismaNutri.medida.findMany({
       where: { clienteId, registradoEm: { gte: desdePeso } },
       orderBy: { registradoEm: "asc" },
+      take: 500,
     }),
   ]);
 
-  const pesoSerie = medidas.map((m) => ({ valor: m.pesoKg, rotulo: FORMATADOR_DATA_CURTA.format(m.registradoEm) }));
+  const pesoSerie = medidas.map((m) => ({
+    valor: m.pesoKg,
+    rotulo: FORMATADOR_DATA_CURTA.format(m.registradoEm),
+    iso: m.registradoEm.toISOString(),
+  }));
   const ultimoPesoKg = medidas.length > 0 ? medidas[medidas.length - 1].pesoKg : null;
 
   // Sem plano ativo as metas ficam zeradas — calcularSaldoDoDia já devolve
