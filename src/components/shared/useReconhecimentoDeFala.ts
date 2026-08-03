@@ -7,6 +7,8 @@ interface SpeechRecognitionResultAlternative {
 }
 interface SpeechRecognitionResult {
   0: SpeechRecognitionResultAlternative;
+  /** true quando o navegador consolidou este trecho (não muda mais). */
+  isFinal: boolean;
 }
 interface SpeechRecognitionResultList {
   length: number;
@@ -14,6 +16,8 @@ interface SpeechRecognitionResultList {
 }
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
+  /** Índice do primeiro resultado que mudou neste evento. */
+  resultIndex: number;
 }
 interface SpeechRecognitionErrorEvent extends Event {
   error: string;
@@ -73,7 +77,12 @@ export function combinarTranscricao(base: string, sessao: string): string {
  * na primeira pausa, e quando o navegador encerra sozinho por silêncio o
  * reconhecimento é reiniciado, acumulando o que já foi dito. Sem isso, uma
  * pausa pra respirar no meio da frase terminava a gravação e às vezes nem
- * chegava a transcrever nada — foi o que o usuário viu.
+ * chegava a transcrever nada.
+ *
+ * O texto consolidado (`baseRef`) só cresce com os resultados `isFinal`, e
+ * cada um entra UMA vez (varrendo a partir de `resultIndex`). O reinício por
+ * silêncio cria uma instância NOVA, de resultados zerados — sem isso, a lista
+ * de resultados antiga era re-somada a cada corte e o texto dobrava em loop.
  */
 export function useReconhecimentoDeFala() {
   const [gravando, setGravando] = useState(false);
@@ -102,61 +111,77 @@ export function useReconhecimentoDeFala() {
     encerrandoRef.current = false;
     callbackRef.current = aoTranscrever;
 
-    const reconhecimento = new Construtor();
-    reconhecimento.lang = "pt-BR";
-    // continuous=true é o coração da correção: não encerra na primeira pausa,
-    // deixa a pessoa concluir a fala.
-    reconhecimento.continuous = true;
-    // interimResults=false parece mais "certo" (só resultado final), mas no
-    // Safari/iOS costuma nunca disparar onresult nenhum nesse modo — grava e
-    // termina sem transcrever nada. Com interimResults=true, guarda sempre o
-    // texto mais recente aqui e entrega ele em onend (que sempre dispara),
-    // em vez de depender de um resultado "final" que o Safari às vezes não
-    // entrega.
-    reconhecimento.interimResults = true;
+    // Fábrica: cada gravação (e cada reinício por silêncio) usa uma instância
+    // NOVA, de resultados zerados. É o que impede o texto de dobrar em loop —
+    // reaproveitar a mesma instância re-entregava os resultados antigos.
+    const criarReconhecimento = (): SpeechRecognitionInstance => {
+      const reconhecimento = new Construtor();
+      reconhecimento.lang = "pt-BR";
+      // continuous=true não encerra na primeira pausa, deixa concluir a fala.
+      reconhecimento.continuous = true;
+      // interimResults=true: o Safari/iOS às vezes nunca dispara um resultado
+      // "final", então guardamos o interino mais recente e entregamos no fim.
+      reconhecimento.interimResults = true;
 
-    reconhecimento.onresult = (evento) => {
-      const sessao = Array.from({ length: evento.results.length }, (_, i) => evento.results[i][0].transcript).join(" ");
-      transcricaoRef.current = combinarTranscricao(baseRef.current, sessao);
-    };
-    reconhecimento.onerror = (evento) => {
-      if (ehErroFatalDeFala(evento.error)) {
-        // Sem permissão/microfone: não adianta reiniciar. Marca pra parar de
-        // vez e avisa (o onend logo em seguida vai encerrar).
-        encerrandoRef.current = true;
-        setErro(
-          evento.error === "not-allowed" || evento.error === "service-not-allowed"
-            ? "libere o microfone pro navegador pra gravar por voz — ou use o texto"
-            : "não deu pra acessar o microfone — use o texto",
-        );
-        return;
-      }
-      // Safari/Chrome disparam "no-speech"/"aborted" mesmo quando já
-      // capturaram algo útil — só mostra erro se não sobrou transcrição, e
-      // deixa o onend decidir entre reiniciar e entregar.
-      if (!transcricaoRef.current) {
-        setErro("não deu pra entender o áudio — tente de novo ou use o texto");
-      }
-    };
-    reconhecimento.onend = () => {
-      // Corte pela pessoa (ou erro fatal): entrega o que tiver e para.
-      if (encerrandoRef.current) {
-        setGravando(false);
-        if (transcricaoRef.current) callbackRef.current?.(transcricaoRef.current);
-        return;
-      }
-      // Corte do navegador (silêncio/limite interno) com a pessoa ainda
-      // gravando: consolida a sessão e recomeça, dando mais tempo de fala.
-      baseRef.current = transcricaoRef.current;
-      try {
-        reconhecimento.start();
-      } catch {
-        // Se o navegador recusar o reinício, não insiste: entrega o que há.
-        setGravando(false);
-        if (transcricaoRef.current) callbackRef.current?.(transcricaoRef.current);
-      }
+      reconhecimento.onresult = (evento) => {
+        // Só o que mudou (a partir de resultIndex): finais entram no texto
+        // consolidado UMA vez; o interino atual fica só por cima, transitório.
+        let interino = "";
+        for (let i = evento.resultIndex; i < evento.results.length; i++) {
+          const resultado = evento.results[i];
+          const trecho = resultado[0].transcript;
+          if (resultado.isFinal) {
+            baseRef.current = combinarTranscricao(baseRef.current, trecho);
+          } else {
+            interino = combinarTranscricao(interino, trecho);
+          }
+        }
+        transcricaoRef.current = combinarTranscricao(baseRef.current, interino);
+      };
+
+      reconhecimento.onerror = (evento) => {
+        if (ehErroFatalDeFala(evento.error)) {
+          // Sem permissão/microfone: não adianta reiniciar. Marca pra parar de
+          // vez e avisa (o onend logo em seguida vai encerrar).
+          encerrandoRef.current = true;
+          setErro(
+            evento.error === "not-allowed" || evento.error === "service-not-allowed"
+              ? "libere o microfone pro navegador pra gravar por voz — ou use o texto"
+              : "não deu pra acessar o microfone — use o texto",
+          );
+          return;
+        }
+        // "no-speech"/"aborted" disparam mesmo com algo útil capturado — só
+        // avisa se não sobrou transcrição; o onend decide reiniciar ou entregar.
+        if (!transcricaoRef.current) {
+          setErro("não deu pra entender o áudio — tente de novo ou use o texto");
+        }
+      };
+
+      reconhecimento.onend = () => {
+        // Corte pela pessoa (ou erro fatal): entrega o que tiver e para.
+        if (encerrandoRef.current) {
+          setGravando(false);
+          if (transcricaoRef.current) callbackRef.current?.(transcricaoRef.current);
+          return;
+        }
+        // Corte do navegador (silêncio) com a pessoa ainda gravando: os finais
+        // já estão em baseRef; recomeça com uma instância nova, sem re-somar
+        // resultados antigos.
+        try {
+          const proximo = criarReconhecimento();
+          reconhecimentoRef.current = proximo;
+          proximo.start();
+        } catch {
+          setGravando(false);
+          if (transcricaoRef.current) callbackRef.current?.(transcricaoRef.current);
+        }
+      };
+
+      return reconhecimento;
     };
 
+    const reconhecimento = criarReconhecimento();
     reconhecimentoRef.current = reconhecimento;
     setGravando(true);
     reconhecimento.start();

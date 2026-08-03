@@ -141,7 +141,6 @@ export function HomeDoCliente({
             <AnelDoDia
               treino={treino?.aderenciaSemana?.percentual ?? null}
               dieta={nutricao ? nutricao.saldo.kcal.percentual : null}
-              agua={hidratacao.percentual}
               total={comporTotalDoDia(nutricao, treino, hidratacao.percentual)}
             />
           </section>
@@ -203,7 +202,7 @@ export function HomeDoCliente({
             <BlocoPeso token={token} ultimoPesoKg={nutricao.ultimoPesoKg} pesoSerie={nutricao.pesoSerie} />
           )}
 
-          <FoguinhoFlutuante />
+          <FoguinhoFlutuante nome={nome} saldo={nutricao?.saldo ?? null} ofensivaDias={ofensiva.dias} />
         </>
       )}
     </main>
