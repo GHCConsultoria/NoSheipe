@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { buscarClientePorToken, buscarResumoDaNavegacao } from "@/lib/cliente/consultas";
 import { NavRodape } from "@/components/cliente/NavRodape";
+import { CabecalhoCliente } from "@/components/cliente/CabecalhoCliente";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +47,12 @@ export default async function LayoutDoCliente({
 
   return (
     <>
+      {/* Avatar/conta no topo direito; o Perfil saiu da barra de baixo. */}
+      <CabecalhoCliente token={params.token} nome={cliente.nome} pendentes={pendentes} />
       {/* pb-24 reserva a altura da barra fixa; sem isso ela cobre o fim da
           página, que é justo onde ficam os botões de registrar. */}
       <div className="entrada-aba pb-24">{children}</div>
-      <NavRodape token={params.token} pendentes={pendentes} temNutricao={temNutricao} temTreino={temTreino} />
+      <NavRodape token={params.token} temNutricao={temNutricao} temTreino={temTreino} />
     </>
   );
 }
