@@ -39,11 +39,21 @@ const config: Config = {
           deep: "var(--color-sheipe-deep)",
           on: "var(--color-on-sheipe)",
         },
-        // Acento do treino — o par do verde da nutrição.
+        // Trio de acentos do anel do dia, um por métrica.
         treino: {
           DEFAULT: "var(--color-treino)",
           deep: "var(--color-treino-deep)",
           on: "var(--color-on-treino)",
+        },
+        agua: {
+          DEFAULT: "var(--color-agua)",
+          deep: "var(--color-agua-deep)",
+          on: "var(--color-on-agua)",
+        },
+        dieta: {
+          DEFAULT: "var(--color-dieta)",
+          deep: "var(--color-dieta-deep)",
+          on: "var(--color-on-dieta)",
         },
       },
       fontFamily: {

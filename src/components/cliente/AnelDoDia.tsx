@@ -1,0 +1,121 @@
+"use client";
+
+import { useId } from "react";
+import { useContagem } from "@/components/shared/useContagem";
+
+interface Props {
+  /** % de aderência de treino na semana; null se o cliente não tem personal. */
+  treino: number | null;
+  /** % de kcal do dia; null se não tem nutricionista. */
+  dieta: number | null;
+  /** % de água do dia (sempre presente — todo mundo bebe água). */
+  agua: number;
+  /** Número grande no centro: a composição do dia (média das métricas ativas). */
+  total: number;
+}
+
+const CAIXA = 200;
+const CENTRO = CAIXA / 2;
+const ESPESSURA = 14;
+/** Raios: treino por fora, dieta no meio; a água é o disco central. */
+const RAIO_TREINO = 86;
+const RAIO_DIETA = 64;
+const RAIO_AGUA = 46;
+
+function fracao(pct: number): number {
+  return Math.min(Math.max(pct, 0), 100) / 100;
+}
+
+/** Anel de traço (treino/dieta). */
+function Anel({ raio, pct, cor, atraso }: { raio: number; pct: number; cor: string; atraso: number }) {
+  const circunferencia = 2 * Math.PI * raio;
+  const restante = circunferencia * (1 - fracao(pct));
+  return (
+    <>
+      <circle cx={CENTRO} cy={CENTRO} r={raio} fill="none" stroke="var(--color-rule)" strokeWidth={ESPESSURA} />
+      <circle
+        className="anel-preenche"
+        cx={CENTRO}
+        cy={CENTRO}
+        r={raio}
+        fill="none"
+        stroke={cor}
+        strokeWidth={ESPESSURA}
+        strokeLinecap="round"
+        strokeDasharray={circunferencia}
+        strokeDashoffset={restante}
+        style={{ "--anel-vazio": circunferencia, animationDelay: `${atraso}ms` } as React.CSSProperties}
+      />
+    </>
+  );
+}
+
+/**
+ * O progresso do dia como o diagrama pediu: treino (verde) por fora, dieta
+ * (gold) no meio e a ÁGUA no centro — um disco que enche de verdade, com a
+ * crista da onda deslizando. O número grande é a composição do dia.
+ *
+ * O nível da água é uma translateY do grupo cheio (desenhado do topo do
+ * disco pra baixo e empurrado pra fora quando vazio), com transição: ao
+ * registrar um copo, a água sobe visível. O recorte circular garante que
+ * só apareça dentro do disco.
+ */
+export function AnelDoDia({ treino, dieta, agua, total }: Props) {
+  const numero = useContagem(total);
+  const clip = useId().replace(/:/g, "");
+
+  // Disco da água: topo em (CENTRO - RAIO_AGUA), altura = 2*RAIO_AGUA.
+  const alturaAgua = 2 * RAIO_AGUA;
+  const nivel = fracao(agua);
+  // Cheio = sem deslocamento; vazio = empurrado todo o disco pra baixo.
+  const deslocamentoY = (1 - nivel) * alturaAgua;
+  const topoAgua = CENTRO - RAIO_AGUA;
+
+  return (
+    <div className="flex justify-center">
+      <div className="relative" style={{ width: 240, height: 240 }}>
+        <svg viewBox={`0 0 ${CAIXA} ${CAIXA}`} width={240} height={240} aria-hidden="true">
+          <defs>
+            <clipPath id={clip}>
+              <circle cx={CENTRO} cy={CENTRO} r={RAIO_AGUA} />
+            </clipPath>
+          </defs>
+
+          <g transform={`rotate(-90 ${CENTRO} ${CENTRO})`}>
+            {treino !== null && <Anel raio={RAIO_TREINO} pct={treino} cor="var(--color-treino)" atraso={0} />}
+            {dieta !== null && <Anel raio={RAIO_DIETA} pct={dieta} cor="var(--color-dieta)" atraso={120} />}
+          </g>
+
+          {/* Poço da água (fundo) e o líquido recortado no disco. */}
+          <circle cx={CENTRO} cy={CENTRO} r={RAIO_AGUA} fill="var(--color-rule)" opacity={0.35} />
+          <g clipPath={`url(#${clip})`}>
+            <g
+              style={{
+                transform: `translateY(${deslocamentoY}px)`,
+                transition: "transform 900ms cubic-bezier(0.16, 1, 0.3, 1)",
+              }}
+            >
+              {/* Corpo do líquido, do topo do disco bem pra baixo. */}
+              <rect x={CENTRO - 60} y={topoAgua + 6} width={120} height={alturaAgua + 60} fill="var(--color-agua)" opacity={0.9} />
+              {/* Crista: uma onda larga que desliza de lado (loop de 40px). */}
+              <path
+                className="onda-agua"
+                fill="var(--color-agua)"
+                d={`M${CENTRO - 100},${topoAgua + 6} q10,-6 20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 V${topoAgua + alturaAgua + 60} H${CENTRO - 100} Z`}
+              />
+            </g>
+          </g>
+          <circle cx={CENTRO} cy={CENTRO} r={RAIO_AGUA} fill="none" stroke="var(--color-agua)" strokeWidth={2} opacity={0.5} />
+        </svg>
+
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="font-display text-4xl leading-none tabular-nums text-ink">
+            {numero}
+            <span className="text-xl">%</span>
+          </span>
+          <span className="eyebrow mt-1 text-ink-soft">do dia</span>
+        </div>
+      </div>
+    </div>
+  );
+}
