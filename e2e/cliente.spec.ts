@@ -87,8 +87,17 @@ test.describe("a barra de navegação do cliente", () => {
     await expect(page).toHaveURL(/\/historico$/);
     await expect(nav.getByRole("link", { name: "Diário" })).toHaveAttribute("aria-current", "page");
 
-    await nav.getByRole("link", { name: "Perfil" }).click();
+    // Marketplace ocupou o lugar do Perfil na barra de baixo.
+    await nav.getByRole("link", { name: "Market" }).click();
+    await expect(page).toHaveURL(/\/marketplace$/);
+    await expect(nav.getByRole("link", { name: "Market" })).toHaveAttribute("aria-current", "page");
+  });
+
+  test("o perfil abre pelo avatar no topo, fora da barra", async ({ page }) => {
+    await page.goto("/p/demo-marina-souza");
+
+    await page.getByRole("link", { name: "Meu perfil" }).click();
     await expect(page).toHaveURL(/\/perfil$/);
-    await expect(nav.getByRole("link", { name: "Perfil" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Meu perfil" })).toHaveAttribute("aria-current", "page");
   });
 });

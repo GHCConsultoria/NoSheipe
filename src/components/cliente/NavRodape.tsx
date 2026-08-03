@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dumbbell, Home, Plus, Salad, UserRound, type LucideIcon } from "lucide-react";
+import { Dumbbell, Home, Plus, Salad, ShoppingBag, type LucideIcon } from "lucide-react";
 import { ehAbaAtiva } from "@/components/shared/abaAtiva";
 
 interface Props {
   token: string;
-  /** Pedidos de acompanhamento esperando resposta — vira o ponto no Perfil. */
-  pendentes: number;
   /** Sem nutricionista não há Diário nem registro de refeição (o "+"). */
   temNutricao: boolean;
   /** Sem personal não há aba de Treino. */
@@ -19,7 +17,6 @@ interface ItemAba {
   href: string;
   rotulo: string;
   Icone: LucideIcon;
-  distintivo?: number;
 }
 
 /**
@@ -27,11 +24,14 @@ interface ItemAba {
  * no desktop: esta área é feita pra celular e instalada como PWA.
  *
  * Cinco lugares no máximo — Home, Diário, o "+" de registrar refeição,
- * Treino e Perfil — mas a barra se adapta aos vínculos: quem só tem
+ * Treino e Marketplace — mas a barra se adapta aos vínculos: quem só tem
  * nutricionista não vê Treino; quem só tem personal não vê Diário nem o "+".
  * O "+" é a ação do dia e por isso ganha o centro, elevado.
+ *
+ * O Perfil saiu daqui pro avatar no topo (CabecalhoCliente): a barra de
+ * baixo é o loop diário, e o Marketplace ocupa o lugar que era do Perfil.
  */
-export function NavRodape({ token, pendentes, temNutricao, temTreino }: Props) {
+export function NavRodape({ token, temNutricao, temTreino }: Props) {
   const base = `/p/${token}`;
   const caminho = usePathname();
 
@@ -41,11 +41,11 @@ export function NavRodape({ token, pendentes, temNutricao, temTreino }: Props) {
   ];
   const direita: ItemAba[] = [
     ...(temTreino ? [{ href: `${base}/treino`, rotulo: "Treino", Icone: Dumbbell }] : []),
-    { href: `${base}/perfil`, rotulo: "Perfil", Icone: UserRound, distintivo: pendentes },
+    { href: `${base}/marketplace`, rotulo: "Market", Icone: ShoppingBag },
   ];
   const hrefs = [...esquerda, ...direita].map((i) => i.href);
 
-  function renderAba({ href, rotulo, Icone, distintivo }: ItemAba) {
+  function renderAba({ href, rotulo, Icone }: ItemAba) {
     const ativa = ehAbaAtiva(caminho, base, href, hrefs);
     return (
       <li key={href} className="flex-1">
@@ -56,19 +56,8 @@ export function NavRodape({ token, pendentes, temNutricao, temTreino }: Props) {
             ativa ? "text-sheipe" : "text-ink-faint hover:text-ink-soft"
           }`}
         >
-          <span className="relative">
-            <Icone size={20} strokeWidth={ativa ? 2 : 1.5} />
-            {Boolean(distintivo) && (
-              <span
-                aria-hidden="true"
-                className="absolute -right-1.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sheipe px-1 text-[0.625rem] font-medium text-sheipe-on"
-              >
-                {distintivo}
-              </span>
-            )}
-          </span>
+          <Icone size={20} strokeWidth={ativa ? 2 : 1.5} />
           {rotulo}
-          {Boolean(distintivo) && <span className="sr-only">{distintivo} aguardando resposta</span>}
         </Link>
       </li>
     );
