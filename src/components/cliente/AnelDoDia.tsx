@@ -8,9 +8,11 @@ interface Props {
   treino: number | null;
   /** % de kcal do dia; null se não tem nutricionista. */
   dieta: number | null;
-  /** % de água do dia (sempre presente — todo mundo bebe água). */
-  agua: number;
-  /** Número grande no centro: a composição do dia (média das métricas ativas). */
+  /**
+   * % do cumprimento das metas do dia (média de água + dieta + treino). É o
+   * número grande do centro E o nível da água — os dois dizem a mesma coisa:
+   * a aguinha enche conforme o dia inteiro é cumprido.
+   */
   total: number;
 }
 
@@ -60,13 +62,14 @@ function Anel({ raio, pct, cor, atraso }: { raio: number; pct: number; cor: stri
  * registrar um copo, a água sobe visível. O recorte circular garante que
  * só apareça dentro do disco.
  */
-export function AnelDoDia({ treino, dieta, agua, total }: Props) {
+export function AnelDoDia({ treino, dieta, total }: Props) {
   const numero = useContagem(total);
   const clip = useId().replace(/:/g, "");
 
   // Disco da água: topo em (CENTRO - RAIO_AGUA), altura = 2*RAIO_AGUA.
   const alturaAgua = 2 * RAIO_AGUA;
-  const nivel = fracao(agua);
+  // O nível da água é o TOTAL das metas — sobe conforme o dia é cumprido.
+  const nivel = fracao(total);
   // Cheio = sem deslocamento; vazio = empurrado todo o disco pra baixo.
   const deslocamentoY = (1 - nivel) * alturaAgua;
   const topoAgua = CENTRO - RAIO_AGUA;

@@ -28,11 +28,12 @@ export function HeaderCliente({ token, nome, fotoUrl, pendentes }: Props) {
       className="sticky top-0 z-40 border-b border-rule bg-paper/90 backdrop-blur"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
-      <div className="mx-auto flex h-14 max-w-md items-center justify-between px-6">
+      {/* Marca centralizada; a foto ancorada à direita, por cima. */}
+      <div className="relative mx-auto flex h-14 max-w-md items-center justify-center px-6">
         <Link href={base} aria-label="Início" className="tatil">
-          <NoSheipeLogo size={22} />
+          <NoSheipeLogo size={24} />
         </Link>
-        <Link href={`${base}/perfil`} aria-label="Meu perfil" className="tatil relative block">
+        <Link href={`${base}/perfil`} aria-label="Meu perfil" className="tatil absolute right-6 block">
           <AvatarCliente fotoUrl={fotoUrl} nome={nome} tamanho={34} className="shadow-sm" />
           {pendentes > 0 && (
             <>
