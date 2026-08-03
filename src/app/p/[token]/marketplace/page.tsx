@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
 import { buscarClientePorToken } from "@/lib/cliente/consultas";
-import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +17,7 @@ export default async function MarketplaceDoCliente({ params }: { params: { token
   }
 
   return (
-    <main className="mx-auto max-w-md px-6 py-10">
-      <div className="mb-3">
-        <NoSheipeLogo size={24} />
-      </div>
+    <main className="mx-auto max-w-md px-6 pb-10 pt-6">
       <h1 className="font-display text-2xl">Marketplace</h1>
 
       <div className="mt-10 flex flex-col items-center gap-4 text-center">

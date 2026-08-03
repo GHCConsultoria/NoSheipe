@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { X } from "lucide-react";
-import { IdentidadeCliente } from "@/components/cliente/IdentidadeCliente";
 import { registrarTreino, removerSessaoTreino } from "@/lib/cliente/publico";
 import type { TreinoDoClienteDados } from "@/lib/cliente/consultas";
 
@@ -14,12 +13,10 @@ import type { TreinoDoClienteDados } from "@/lib/cliente/consultas";
  */
 export function TreinoDoCliente({
   token,
-  nome,
-  fotoUrl,
   treino,
   aderenciaSemana,
   sessoes,
-}: TreinoDoClienteDados & { token: string; nome: string; fotoUrl: string | null }) {
+}: TreinoDoClienteDados & { token: string }) {
   const router = useRouter();
   const [texto, setTexto] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -46,8 +43,7 @@ export function TreinoDoCliente({
   }
 
   return (
-    <main className="mx-auto max-w-md px-6 py-10">
-      <IdentidadeCliente token={token} nome={nome} fotoUrl={fotoUrl} />
+    <main className="mx-auto max-w-md px-6 pb-10 pt-6">
       <h1 className="font-display text-2xl">Seu treino</h1>
       {aderenciaSemana && (
         <p className="mt-2 text-sm text-ink-soft">

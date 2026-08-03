@@ -256,7 +256,7 @@ export function ChamaDaSemana({
   const azul = ofensiva.dias >= 7;
 
   return (
-    <section className="paper-card mt-8 rounded-sm p-4">
+    <section id="constancia" className="paper-card mt-8 scroll-mt-20 rounded-sm p-4">
       <div className="flex items-center gap-3">
         <div
           className={`flex flex-col items-center rounded-sm px-3 py-2 ${

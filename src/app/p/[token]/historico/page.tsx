@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { buscarClientePorToken, buscarHistoricoDeDias } from "@/lib/cliente/consultas";
 import { estaForaDaMeta } from "@/lib/nutri/aderencia";
-import { IdentidadeCliente } from "@/components/cliente/IdentidadeCliente";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +22,6 @@ export default async function HistoricoCliente({ params }: { params: { token: st
   return (
     <main className="mx-auto max-w-md px-6 py-10">
       {/* Sem link de "voltar": a barra do rodapé já leva pra qualquer aba. */}
-      <IdentidadeCliente token={cliente.tokenAcesso} nome={cliente.nome} fotoUrl={cliente.fotoBase64} />
       <h1 className="font-display text-2xl">Seu histórico</h1>
       <p className="mt-1 text-sm text-ink-soft">Últimos 14 dias com registro.</p>
 
