@@ -393,6 +393,12 @@ ALTER TABLE "refeicoes" ADD COLUMN "ajustadoManualmente" BOOLEAN NOT NULL DEFAUL
 -- aplicar-schema trata como "já aplicado" — idempotente como os ALTERs acima.
 ALTER TABLE "clientes" ADD COLUMN "metaAguaMl" INTEGER NOT NULL DEFAULT 2000;
 
+-- AlterTable
+-- Foto de perfil do cliente (data URL de um JPEG reduzido a 256px). Fica na
+-- linha por ser pequena e não depender de storage externo. Idempotente do
+-- mesmo jeito que os ALTERs acima.
+ALTER TABLE "clientes" ADD COLUMN "fotoBase64" TEXT;
+
 -- CreateTable
 CREATE TABLE IF NOT EXISTS "registros_agua" (
     "id" TEXT NOT NULL PRIMARY KEY,

@@ -9,6 +9,7 @@ import {
   ajustarMacrosSchema,
   definirMetaAguaSchema,
   favoritoSchema,
+  fotoPerfilSchema,
   inscricaoPushSchema,
   registrarAguaSchema,
   registrarPesoSchema,
@@ -219,6 +220,36 @@ export async function removerUltimaAgua(input: unknown): Promise<ResultadoAcaoPu
   await prismaNutri.registroAgua.delete({ where: { id: ultimo.id } });
 
   revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/** O cliente define a própria foto de perfil (já reduzida no aparelho). */
+export async function salvarFotoPerfil(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = fotoPerfilSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "foto inválida" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.cliente.update({ where: { id: cliente.id }, data: { fotoBase64: parsed.data.fotoBase64 } });
+
+  revalidatePath(`/p/${parsed.data.token}`, "layout");
+  return { sucesso: true };
+}
+
+/** Remove a foto — volta pra inicial do nome. */
+export async function removerFotoPerfil(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = tokenSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "token inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.cliente.update({ where: { id: cliente.id }, data: { fotoBase64: null } });
+
+  revalidatePath(`/p/${parsed.data.token}`, "layout");
   return { sucesso: true };
 }
 

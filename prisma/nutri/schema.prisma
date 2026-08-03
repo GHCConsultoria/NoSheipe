@@ -108,6 +108,12 @@ model Cliente {
   // então ele ajusta na própria página; 2000ml é só o ponto de partida.
   metaAguaMl Int @default(2000)
 
+  // Foto de perfil do cliente, como data URL (JPEG reduzido a 256px no
+  // próprio aparelho). Fica na linha por ser pequena (~15KB) e evitar
+  // depender de um provedor de storage — o cliente sobe pela página dele,
+  // sem sessão. Null = mostra a inicial do nome.
+  fotoBase64 String?
+
   vinculos            Vinculo[]
   planosNutricionais  PlanoNutricional[]
   treinos             TreinoPrescrito[]

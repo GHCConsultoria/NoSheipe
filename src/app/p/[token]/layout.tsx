@@ -47,8 +47,14 @@ export default async function LayoutDoCliente({
 
   return (
     <>
-      {/* Avatar/conta no topo direito; o Perfil saiu da barra de baixo. */}
-      <CabecalhoCliente token={params.token} nome={cliente.nome} pendentes={pendentes} />
+      {/* Atalho pro perfil no canto — só aparece no Marketplace (as outras
+          telas têm a faixa de identidade). */}
+      <CabecalhoCliente
+        token={params.token}
+        nome={cliente.nome}
+        fotoUrl={cliente.fotoBase64}
+        pendentes={pendentes}
+      />
       {/* pb-24 reserva a altura da barra fixa; sem isso ela cobre o fim da
           página, que é justo onde ficam os botões de registrar. */}
       <div className="entrada-aba pb-24">{children}</div>

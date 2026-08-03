@@ -2,44 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AvatarCliente } from "@/components/cliente/AvatarCliente";
 
 interface Props {
   token: string;
   nome: string;
+  fotoUrl: string | null;
   /** Pedidos de acompanhamento esperando resposta — vira o ponto no avatar. */
   pendentes: number;
 }
 
 /**
- * Avatar flutuante no canto superior direito — o acesso ao perfil/conta,
- * que saiu da barra de baixo (lá embaixo é o loop diário; Perfil virou
- * Marketplace). Fica fixo em todas as telas do cliente, carrega o ponto de
- * "tem alguém esperando sua resposta" e, quando houver, será a foto do
- * usuário. Por enquanto mostra a inicial do nome num círculo.
+ * Avatar flutuante no canto superior direito — mas SÓ na tela de
+ * Marketplace. Nas demais telas o acesso ao perfil já é a faixa de
+ * identidade no topo (IdentidadeCliente); o Marketplace não tem essa faixa
+ * (é vitrine, não o perfil da pessoa), então precisa deste atalho pro
+ * perfil. Fora do Marketplace, não renderiza nada.
  *
- * respeita a safe-area do topo: no PWA instalado a barra de status come o
- * canto, então o avatar desce o quanto ela ocupa.
+ * Respeita a safe-area do topo: no PWA instalado a barra de status ocupa o
+ * canto, então o avatar desce o quanto ela pede.
  */
-export function CabecalhoCliente({ token, nome, pendentes }: Props) {
+export function CabecalhoCliente({ token, nome, fotoUrl, pendentes }: Props) {
   const base = `/p/${token}`;
   const caminho = usePathname();
-  const noPerfil = caminho === `${base}/perfil`;
-  const inicial = nome.trim().charAt(0).toUpperCase() || "?";
+  if (caminho !== `${base}/marketplace`) return null;
 
   return (
     <Link
       href={`${base}/perfil`}
       aria-label="Meu perfil"
-      aria-current={noPerfil ? "page" : undefined}
       className="tatil fixed right-4 z-50"
       style={{ top: "calc(env(safe-area-inset-top) + 0.75rem)" }}
     >
-      <span
-        className={`relative flex h-9 w-9 items-center justify-center rounded-full bg-sheipe text-sm font-medium text-sheipe-on shadow-md ${
-          noPerfil ? "ring-2 ring-sheipe ring-offset-2 ring-offset-paper" : ""
-        }`}
-      >
-        {inicial}
+      <span className="relative block">
+        <AvatarCliente fotoUrl={fotoUrl} nome={nome} tamanho={36} className="shadow-md" />
         {pendentes > 0 && (
           <>
             <span

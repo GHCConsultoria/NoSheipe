@@ -32,6 +32,7 @@ export default async function PaginaCliente({ params }: { params: { token: strin
       ofensiva={painel.ofensiva}
       recados={painel.recados}
       chavePush={chavePublicaPush()}
+      fotoUrl={cliente.fotoBase64}
     />
   );
 }

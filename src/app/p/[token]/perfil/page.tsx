@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { buscarClientePorToken, buscarPainelDoCliente } from "@/lib/cliente/consultas";
 import { MeusProfissionais, SolicitacoesPendentes } from "@/components/cliente/MeusProfissionais";
 import { MeusDadosLGPD } from "@/components/cliente/MeusDadosLGPD";
-import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
+import { FotoPerfilUpload } from "@/components/cliente/FotoPerfilUpload";
 import { ThemeToggle } from "@/components/nutri/ThemeToggle";
 
 export const dynamic = "force-dynamic";
@@ -26,11 +26,9 @@ export default async function PerfilDoCliente({ params }: { params: { token: str
 
   return (
     <main className="mx-auto max-w-md px-6 py-10">
-      <div className="mb-3">
-        <NoSheipeLogo size={24} />
-      </div>
-      <h1 className="font-display text-2xl">{cliente.nome}</h1>
+      <FotoPerfilUpload token={cliente.tokenAcesso} nome={cliente.nome} fotoUrl={cliente.fotoBase64} />
 
+      <div className="mt-6" />
       <SolicitacoesPendentes token={cliente.tokenAcesso} solicitacoes={painel.solicitacoes} />
 
       <MeusProfissionais

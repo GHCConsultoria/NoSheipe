@@ -165,6 +165,19 @@ export const registrarAguaSchema = tokenSchema.extend({
   ml: z.coerce.number().int().positive("volume deve ser positivo").max(5000, "volume fora do plausível").optional(),
 });
 
+/**
+ * Foto de perfil — data URL de imagem, já reduzida no aparelho. Teto de
+ * ~400 KB de string (a foto vai a 256px, fica bem abaixo disso) evita corpo
+ * grande e linha inchada no banco.
+ */
+export const fotoPerfilSchema = tokenSchema.extend({
+  fotoBase64: z
+    .string()
+    .min(1, "imagem vazia")
+    .max(400_000, "imagem grande demais")
+    .refine((v) => v.startsWith("data:image/"), { message: "formato de imagem inválido" }),
+});
+
 /** Cliente ajustando a própria meta diária de água. */
 export const definirMetaAguaSchema = tokenSchema.extend({
   metaMl: z.coerce
