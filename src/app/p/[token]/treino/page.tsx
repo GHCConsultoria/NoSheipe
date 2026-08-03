@@ -20,5 +20,7 @@ export default async function PaginaTreinoDoCliente({ params }: { params: { toke
   }
 
   const dados = await buscarTreinoDoCliente(cliente.id);
-  return <TreinoDoCliente token={cliente.tokenAcesso} {...dados} />;
+  return (
+    <TreinoDoCliente token={cliente.tokenAcesso} nome={cliente.nome} fotoUrl={cliente.fotoBase64} {...dados} />
+  );
 }

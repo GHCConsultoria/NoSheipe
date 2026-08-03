@@ -93,11 +93,11 @@ test.describe("a barra de navegação do cliente", () => {
     await expect(nav.getByRole("link", { name: "Market" })).toHaveAttribute("aria-current", "page");
   });
 
-  test("o perfil abre pelo avatar no topo, fora da barra", async ({ page }) => {
+  test("o perfil abre pela faixa de identidade no topo, fora da barra", async ({ page }) => {
     await page.goto("/p/demo-marina-souza");
 
+    // A foto + nome no topo é o acesso ao perfil (o Perfil saiu da barra).
     await page.getByRole("link", { name: "Meu perfil" }).click();
     await expect(page).toHaveURL(/\/perfil$/);
-    await expect(page.getByRole("link", { name: "Meu perfil" })).toHaveAttribute("aria-current", "page");
   });
 });

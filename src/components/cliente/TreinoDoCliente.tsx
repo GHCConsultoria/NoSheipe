@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { X } from "lucide-react";
-import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
+import { IdentidadeCliente } from "@/components/cliente/IdentidadeCliente";
 import { registrarTreino, removerSessaoTreino } from "@/lib/cliente/publico";
 import type { TreinoDoClienteDados } from "@/lib/cliente/consultas";
 
@@ -12,7 +12,14 @@ import type { TreinoDoClienteDados } from "@/lib/cliente/consultas";
  * check-in de treino (texto livre, sem IA — ao contrário da refeição). O
  * registro morava na home; ganhou tela própria pra não competir com a dieta.
  */
-export function TreinoDoCliente({ token, treino, aderenciaSemana, sessoes }: TreinoDoClienteDados & { token: string }) {
+export function TreinoDoCliente({
+  token,
+  nome,
+  fotoUrl,
+  treino,
+  aderenciaSemana,
+  sessoes,
+}: TreinoDoClienteDados & { token: string; nome: string; fotoUrl: string | null }) {
   const router = useRouter();
   const [texto, setTexto] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -40,9 +47,7 @@ export function TreinoDoCliente({ token, treino, aderenciaSemana, sessoes }: Tre
 
   return (
     <main className="mx-auto max-w-md px-6 py-10">
-      <div className="mb-3">
-        <NoSheipeLogo size={24} />
-      </div>
+      <IdentidadeCliente token={token} nome={nome} fotoUrl={fotoUrl} />
       <h1 className="font-display text-2xl">Seu treino</h1>
       {aderenciaSemana && (
         <p className="mt-2 text-sm text-ink-soft">

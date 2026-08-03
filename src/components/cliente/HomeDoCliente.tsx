@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Camera, Droplet, Flame, MessageCircle, Mic, Plus, Square, Undo2, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
-import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
+import { IdentidadeCliente } from "@/components/cliente/IdentidadeCliente";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
 import { GraficoLinha } from "@/components/shared/GraficoLinha";
 import {
@@ -85,6 +85,8 @@ interface Props {
   recados: { id: string; texto: string; profissionalNome: string; quando: string; lido: boolean }[];
   /** Chave pública VAPID pro opt-in de lembretes; null se o push não está configurado. */
   chavePush: string | null;
+  /** Foto de perfil (data URL) pra faixa de identidade no topo; null = inicial. */
+  fotoUrl: string | null;
 }
 
 /**
@@ -105,15 +107,14 @@ export function HomeDoCliente({
   ofensiva,
   recados,
   chavePush,
+  fotoUrl,
 }: Props) {
   const semAcompanhamento = !nutricao && !treino;
 
   return (
     <main className="mx-auto max-w-md px-6 py-10">
-      <div className="mb-3">
-        <NoSheipeLogo size={24} />
-      </div>
-      <h1 className="font-display text-2xl">Olá, {nome}</h1>
+      <IdentidadeCliente token={token} nome={nome} fotoUrl={fotoUrl} />
+      <h1 className="font-display text-2xl">Olá 👋</h1>
 
       {semAcompanhamento ? (
         <div className="mt-6 flex flex-col items-start gap-3">
