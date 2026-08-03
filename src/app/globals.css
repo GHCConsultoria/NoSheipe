@@ -45,11 +45,20 @@
      um par que se distinga num relance sem brigar — e sem cair nos tons já
      ocupados por urgente/atenção/calmo. Ciano contra verde lê como sinal
      vital, não como enfeite. */
-  --color-treino: #22d3ee;
-  --color-treino-deep: #67e8f9;
-  /* Texto sobre o ciano do treino. Espelha --color-on-sheipe: o ciano é
-     claro no escuro, então o texto por cima é escuro. */
-  --color-on-treino: #04141a;
+  /* Trio de acentos do dia, um por métrica do anel:
+     - treino = verde neon (lima), o par vivo do verde da marca
+     - água   = ciano (era a cor do treino antes desta virada)
+     - dieta  = laranja gold
+     Cada um com seu "on-" (texto por cima) com contraste nos dois temas. */
+  --color-treino: #84cc16;
+  --color-treino-deep: #a3e635;
+  --color-on-treino: #0f1a00;
+  --color-agua: #22d3ee;
+  --color-agua-deep: #67e8f9;
+  --color-on-agua: #04141a;
+  --color-dieta: #f59e0b;
+  --color-dieta-deep: #fbbf24;
+  --color-on-dieta: #1a1200;
 
   /* Fixas — não trocam com o tema. Painel de assinatura (login) fica sempre
      no mesmo tom, mesmo se o resto virar claro. */
@@ -97,10 +106,15 @@
     --color-sheipe: #16a34a;
     --color-sheipe-deep: #15803d;
     --color-on-sheipe: #f0fdf4;
-    --color-treino: #0891b2;
-    --color-treino-deep: #0e7490;
-    /* Ciano mais escuro no claro — texto por cima fica claro. */
-    --color-on-treino: #ecfeff;
+    --color-treino: #65a30d;
+    --color-treino-deep: #4d7c0f;
+    --color-on-treino: #f7fee7;
+    --color-agua: #0891b2;
+    --color-agua-deep: #0e7490;
+    --color-on-agua: #ecfeff;
+    --color-dieta: #d97706;
+    --color-dieta-deep: #b45309;
+    --color-on-dieta: #fffbeb;
 
     --shadow-card: 0 1px 2px rgba(16, 18, 21, 0.04), 0 8px 24px -12px rgba(16, 18, 21, 0.12);
   }
@@ -132,9 +146,15 @@
   --color-sheipe: #22c55e;
   --color-sheipe-deep: #4ade80;
   --color-on-sheipe: #04150a;
-  --color-treino: #22d3ee;
-  --color-treino-deep: #67e8f9;
-  --color-on-treino: #04141a;
+  --color-treino: #84cc16;
+  --color-treino-deep: #a3e635;
+  --color-on-treino: #0f1a00;
+  --color-agua: #22d3ee;
+  --color-agua-deep: #67e8f9;
+  --color-on-agua: #04141a;
+  --color-dieta: #f59e0b;
+  --color-dieta-deep: #fbbf24;
+  --color-on-dieta: #1a1200;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
@@ -157,9 +177,15 @@
   --color-sheipe: #16a34a;
   --color-sheipe-deep: #15803d;
   --color-on-sheipe: #f0fdf4;
-  --color-treino: #0891b2;
-  --color-treino-deep: #0e7490;
-  --color-on-treino: #ecfeff;
+  --color-treino: #65a30d;
+  --color-treino-deep: #4d7c0f;
+  --color-on-treino: #f7fee7;
+  --color-agua: #0891b2;
+  --color-agua-deep: #0e7490;
+  --color-on-agua: #ecfeff;
+  --color-dieta: #d97706;
+  --color-dieta-deep: #b45309;
+  --color-on-dieta: #fffbeb;
   --shadow-card: 0 1px 2px rgba(16, 18, 21, 0.04), 0 8px 24px -12px rgba(16, 18, 21, 0.12);
 }
 
@@ -269,6 +295,16 @@ body {
     animation: barra-preenche var(--duracao-anel) var(--curva-saida) backwards;
     transform-origin: left center;
   }
+
+  /*
+   * Onda da água no centro do anel do dia: a superfície desliza de lado num
+   * loop contínuo, dando a sensação de líquido. O nível (o quanto está
+   * cheio) é uma translateY no grupo, feita no componente com transição —
+   * aqui mora só o deslize horizontal da crista.
+   */
+  .onda-agua {
+    animation: onda-agua 2.6s linear infinite;
+  }
 }
 
 @keyframes fade-up {
@@ -305,6 +341,16 @@ body {
   }
 }
 
+/* Um comprimento de onda (40px) de deslize — no fim, casa com o começo. */
+@keyframes onda-agua {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-40px);
+  }
+}
+
 /*
  * Quem pediu menos movimento recebe o resultado final, imediato — nunca
  * uma tela vazia. Todo efeito acima é decoração sobre um estado que já
@@ -314,7 +360,8 @@ body {
   .stagger-in,
   .entrada-aba,
   .anel-preenche,
-  .barra-preenche {
+  .barra-preenche,
+  .onda-agua {
     animation: none;
   }
   .expand {

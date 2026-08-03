@@ -3,24 +3,23 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Camera, Droplet, Flame, MessageCircle, Mic, Plus, Square, Undo2, X } from "lucide-react";
+import { Camera, MessageCircle, Mic, Square, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
-import { IdentidadeCliente } from "@/components/cliente/IdentidadeCliente";
+import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
+import { AvatarCliente } from "@/components/cliente/AvatarCliente";
 import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
 import { GraficoLinha } from "@/components/shared/GraficoLinha";
 import {
   ajustarRefeicao,
-  definirMetaAgua,
   estimarRefeicao,
   marcarRecadosLidos,
-  registrarAgua,
   registrarPeso,
   removerFavorito,
   removerRefeicao,
-  removerUltimaAgua,
   salvarFavorito,
 } from "@/lib/cliente/publico";
-import { AnelDeProgresso, type Arco } from "@/components/shared/AnelDeProgresso";
+import { AnelDoDia } from "@/components/cliente/AnelDoDia";
+import { ChamaDaSemana, LegendasDoDia, MacrosDoDia } from "@/components/cliente/PainelDoDia";
 import { GerenciarPush } from "@/components/cliente/GerenciarPush";
 
 interface SaldoMacro {
@@ -82,10 +81,11 @@ interface Props {
   } | null;
   hidratacao: { consumidoMl: number; metaMl: number; percentual: number; copoMl: number };
   ofensiva: { dias: number; ativaHoje: boolean };
+  semana: { dias: boolean[]; hoje: number };
   recados: { id: string; texto: string; profissionalNome: string; quando: string; lido: boolean }[];
   /** Chave pública VAPID pro opt-in de lembretes; null se o push não está configurado. */
   chavePush: string | null;
-  /** Foto de perfil (data URL) pra faixa de identidade no topo; null = inicial. */
+  /** Foto de perfil (data URL) pro header; null = inicial. */
   fotoUrl: string | null;
 }
 
@@ -105,16 +105,31 @@ export function HomeDoCliente({
   treino,
   hidratacao,
   ofensiva,
+  semana,
   recados,
   chavePush,
   fotoUrl,
 }: Props) {
   const semAcompanhamento = !nutricao && !treino;
+  const primeiroNome = nome.trim().split(/\s+/)[0];
+  const semanasSeguidas = Math.floor(ofensiva.dias / 7);
 
   return (
     <main className="mx-auto max-w-md px-6 py-10">
-      <IdentidadeCliente token={token} nome={nome} fotoUrl={fotoUrl} />
-      <h1 className="font-display text-2xl">Olá 👋</h1>
+      <header className="mb-5 flex items-center justify-between">
+        <NoSheipeLogo size={22} />
+        <Link href={`/p/${token}/perfil`} aria-label="Meu perfil" className="tatil">
+          <AvatarCliente fotoUrl={fotoUrl} nome={nome} tamanho={36} className="shadow-sm" />
+        </Link>
+      </header>
+      <div className="flex items-baseline justify-between gap-3">
+        <h1 className="font-display text-2xl">Olá, {primeiroNome}!</h1>
+        {semanasSeguidas >= 1 && (
+          <span className="shrink-0 rounded-full bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-400">
+            🔥 {semanasSeguidas} {semanasSeguidas === 1 ? "semana azul" : "semanas azuis"}
+          </span>
+        )}
+      </div>
 
       {semAcompanhamento ? (
         <div className="mt-6 flex flex-col items-start gap-3">
@@ -132,25 +147,64 @@ export function HomeDoCliente({
         </div>
       ) : (
         <>
-          <section className="mt-8">
-            <AnelDeProgresso arcos={montarArcos(nutricao, treino)} />
+          <section className="mt-6">
+            <AnelDoDia
+              treino={treino?.aderenciaSemana?.percentual ?? null}
+              dieta={nutricao ? nutricao.saldo.kcal.percentual : null}
+              agua={hidratacao.percentual}
+              total={comporTotalDoDia(nutricao, treino, hidratacao.percentual)}
+            />
           </section>
 
-          {ofensiva.dias > 0 && <Ofensiva ofensiva={ofensiva} />}
+          <LegendasDoDia
+            token={token}
+            agua={{
+              consumidoMl: hidratacao.consumidoMl,
+              metaMl: hidratacao.metaMl,
+              percentual: hidratacao.percentual,
+            }}
+            dieta={
+              nutricao
+                ? {
+                    consumido: nutricao.saldo.kcal.consumido,
+                    meta: nutricao.saldo.kcal.meta,
+                    percentual: nutricao.saldo.kcal.percentual,
+                  }
+                : null
+            }
+            treino={
+              treino?.aderenciaSemana
+                ? {
+                    percentual: treino.aderenciaSemana.percentual,
+                    diasTreinados: treino.aderenciaSemana.diasTreinados,
+                    diasPorSemana: treino.aderenciaSemana.diasPorSemana,
+                    feitoHoje: treino.sessoesHoje.length > 0,
+                  }
+                : null
+            }
+          />
 
-          {recados.length > 0 && <BlocoRecados token={token} recados={recados} />}
+          {nutricao && (
+            <MacrosDoDia
+              proteina={nutricao.saldo.proteina}
+              carbo={nutricao.saldo.carbo}
+              gordura={nutricao.saldo.gordura}
+            />
+          )}
 
           {treino && !treino.aderenciaSemana && (
             <p className="mt-4 text-center text-sm text-attention">Seu personal ainda não prescreveu um treino.</p>
           )}
+
+          <ChamaDaSemana semana={semana} ofensiva={ofensiva} />
+
+          {recados.length > 0 && <BlocoRecados token={token} recados={recados} />}
 
           {nutricao && (
             <div className="mt-6 flex justify-center">
               <CompartilharResumoDoDia nomePaciente={nome} saldo={nutricao.saldo} />
             </div>
           )}
-
-          <BlocoAgua token={token} hidratacao={hidratacao} />
 
           <GerenciarPush token={token} chavePublica={chavePush} />
 
@@ -166,35 +220,20 @@ export function HomeDoCliente({
 }
 
 /**
- * Traduz os blocos do painel nos arcos do anel. A ordem importa: dieta por
- * fora, treino por dentro, e o primeiro da lista é quem leva o número
- * grande no centro. Quem só tem treino vê o treino no lugar de honra.
- *
- * Só entra arco de treino se existir treino prescrito — sem meta não há
- * percentual honesto a desenhar, e a tela avisa isso em texto.
+ * O número grande do centro: a média das métricas que o cliente acompanha
+ * (cada uma limitada a 100% pra uma não estourar a conta da outra). Água
+ * conta sempre; dieta e treino entram conforme o vínculo — assim quem só
+ * tem um lado ainda vê um "% do dia" honesto.
  */
-function montarArcos(nutricao: Props["nutricao"], treino: Props["treino"]): Arco[] {
-  const arcos: Arco[] = [];
-
-  if (nutricao) {
-    arcos.push({
-      percentual: nutricao.saldo.kcal.percentual,
-      rotulo: "Dieta hoje",
-      detalhe: `${nutricao.saldo.kcal.consumido} / ${nutricao.saldo.kcal.meta} kcal`,
-      cor: "sheipe",
-    });
-  }
-
-  if (treino?.aderenciaSemana) {
-    arcos.push({
-      percentual: treino.aderenciaSemana.percentual,
-      rotulo: "Treino na semana",
-      detalhe: `${treino.aderenciaSemana.diasTreinados} de ${treino.aderenciaSemana.diasPorSemana} dias`,
-      cor: "treino",
-    });
-  }
-
-  return arcos;
+function comporTotalDoDia(
+  nutricao: Props["nutricao"],
+  treino: Props["treino"],
+  aguaPct: number,
+): number {
+  const partes: number[] = [Math.min(aguaPct, 100)];
+  if (nutricao) partes.push(Math.min(nutricao.saldo.kcal.percentual, 100));
+  if (treino?.aderenciaSemana) partes.push(Math.min(treino.aderenciaSemana.percentual, 100));
+  return Math.round(partes.reduce((s, p) => s + p, 0) / partes.length);
 }
 
 function BlocoRefeicao({
@@ -576,151 +615,6 @@ function BlocoRecados({
           </li>
         ))}
       </ul>
-    </section>
-  );
-}
-
-/**
- * Ofensiva — dias seguidos com registro. Some quando é zero (nada a
- * comemorar ainda); quando hoje ainda não teve registro, a sequência de
- * ontem aparece como "em risco", pra empurrar o registro do dia.
- */
-function Ofensiva({ ofensiva }: { ofensiva: NonNullable<Props["ofensiva"]> }) {
-  const { dias, ativaHoje } = ofensiva;
-  return (
-    <div className="mt-4 flex justify-center">
-      <div
-        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
-          ativaHoje ? "border-attention-line text-attention" : "border-rule text-ink-soft"
-        }`}
-      >
-        <Flame size={16} strokeWidth={2} className={ativaHoje ? "text-attention" : "text-ink-faint"} />
-        <span className="font-medium">
-          {dias} {dias === 1 ? "dia" : "dias"} seguidos
-        </span>
-        {!ativaHoje && <span className="text-xs text-ink-faint">· registre hoje pra não perder</span>}
-      </div>
-    </div>
-  );
-}
-
-function BlocoAgua({
-  token,
-  hidratacao,
-}: {
-  token: string;
-  hidratacao: NonNullable<Props["hidratacao"]>;
-}) {
-  const router = useRouter();
-  const [pendente, iniciarTransicao] = useTransition();
-  const [erro, setErro] = useState<string | null>(null);
-  const [editandoMeta, setEditandoMeta] = useState(false);
-  const [rascunhoMeta, setRascunhoMeta] = useState(String(hidratacao.metaMl));
-
-  const { consumidoMl, metaMl, percentual, copoMl } = hidratacao;
-  // A barra é visual: trava em 100% mesmo quando bebeu além da meta. O número
-  // ao lado continua mostrando o percentual real, sem teto.
-  const larguraBarra = Math.min(100, percentual);
-  const copos = Math.round(consumidoMl / copoMl);
-
-  function agir(acao: () => Promise<{ sucesso: boolean; erro?: string }>) {
-    setErro(null);
-    iniciarTransicao(async () => {
-      const resultado = await acao();
-      if (!resultado.sucesso) setErro(resultado.erro ?? "não deu — tente de novo");
-      router.refresh();
-    });
-  }
-
-  function salvarMeta() {
-    setErro(null);
-    iniciarTransicao(async () => {
-      const resultado = await definirMetaAgua({ token, metaMl: rascunhoMeta });
-      if (!resultado.sucesso) {
-        setErro(resultado.erro);
-        return;
-      }
-      setEditandoMeta(false);
-      router.refresh();
-    });
-  }
-
-  return (
-    <section className="paper-card mt-8 rounded-sm p-4">
-      <div className="flex items-baseline justify-between">
-        <h2 className="eyebrow flex items-center gap-1.5">
-          <Droplet size={13} strokeWidth={1.75} className="text-treino" /> Água
-        </h2>
-        <button
-          type="button"
-          onClick={() => {
-            setRascunhoMeta(String(metaMl));
-            setEditandoMeta((v) => !v);
-          }}
-          className="text-xs text-ink-faint underline underline-offset-2 transition-colors hover:text-treino"
-        >
-          {consumidoMl} / {metaMl} ml
-        </button>
-      </div>
-
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-paper">
-        <div
-          className="barra-preenche h-full rounded-full bg-treino transition-[width] duration-500"
-          style={{ width: `${larguraBarra}%` }}
-        />
-      </div>
-      <p className="mt-1.5 text-xs text-ink-faint">
-        {copos > 0 ? `${copos} ${copos === 1 ? "copo" : "copos"} hoje` : "nenhum copo ainda"} · {percentual}% da meta
-      </p>
-
-      <div className="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          disabled={pendente}
-          onClick={() => agir(() => registrarAgua({ token }))}
-          className="tatil inline-flex items-center gap-1.5 rounded-sm bg-treino px-4 py-2 text-sm font-medium text-treino-on shadow-sm transition-colors hover:opacity-90 disabled:opacity-50"
-        >
-          <Plus size={16} strokeWidth={2.25} /> Copo ({copoMl} ml)
-        </button>
-        {consumidoMl > 0 && (
-          <button
-            type="button"
-            disabled={pendente}
-            aria-label="Desfazer último copo"
-            onClick={() => agir(() => removerUltimaAgua({ token }))}
-            className="tatil inline-flex items-center gap-1 rounded-sm border border-rule px-3 py-2 text-xs text-ink-soft transition-colors hover:border-treino hover:text-ink disabled:opacity-50"
-          >
-            <Undo2 size={14} /> Desfazer
-          </button>
-        )}
-      </div>
-
-      {editandoMeta && (
-        <div className="mt-3 flex items-end gap-2">
-          <label className="flex flex-col gap-0.5 text-[0.65rem] text-ink-faint">
-            Meta diária (ml)
-            <input
-              type="number"
-              min={250}
-              step={250}
-              inputMode="numeric"
-              value={rascunhoMeta}
-              onChange={(e) => setRascunhoMeta(e.target.value)}
-              className="w-28 rounded-sm border border-rule bg-paper px-2 py-1 text-sm outline-none focus:border-treino"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={pendente}
-            onClick={salvarMeta}
-            className="tatil rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-treino hover:text-ink disabled:opacity-50"
-          >
-            Salvar meta
-          </button>
-        </div>
-      )}
-
-      {erro && <p className="mt-2 text-sm text-urgent">{erro}</p>}
     </section>
   );
 }

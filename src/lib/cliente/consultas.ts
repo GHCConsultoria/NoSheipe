@@ -96,6 +96,8 @@ export interface PainelDoCliente {
   hidratacao: Hidratacao;
   /** Ofensiva: dias seguidos com registro — independe de vínculo. */
   ofensiva: Ofensiva;
+  /** Semana atual: quais dias (seg..dom) tiveram registro, e qual é hoje. */
+  semana: { dias: boolean[]; hoje: number };
   /** Recados que os profissionais mandaram — mais recentes primeiro. */
   recados: RecadoDoCliente[];
   /** Quem acompanha hoje — o cliente pode encerrar qualquer um. */
@@ -151,6 +153,47 @@ async function montarOfensiva(clienteId: string): Promise<Ofensiva> {
   return calcularOfensiva(dias, CHAVE_DIA_SP.format(new Date()));
 }
 
+/** Índice do dia da semana em SP: segunda=0 .. domingo=6. */
+function indiceDiaSemana(data: Date): number {
+  const chave = CHAVE_DIA_SP.format(data); // yyyy-mm-dd em SP
+  const dow = new Date(`${chave}T12:00:00.000Z`).getUTCDay(); // 0=domingo..6=sábado
+  return (dow + 6) % 7;
+}
+
+/**
+ * Dias da semana atual (segunda a domingo) com QUALQUER registro — vira a
+ * fileira de chamas da "constância". `hoje` é o índice do dia corrente, pra
+ * UI destacar a casa de hoje.
+ */
+async function montarSemana(clienteId: string): Promise<{ dias: boolean[]; hoje: number }> {
+  const { inicio, fim } = limitesDaSemanaEmSaoPaulo();
+
+  const [refeicoes, sessoes, aguas] = await Promise.all([
+    prismaNutri.refeicao.findMany({
+      where: { clienteId, registradoEm: { gte: inicio, lt: fim } },
+      select: { registradoEm: true },
+    }),
+    prismaNutri.sessaoTreino.findMany({
+      where: { clienteId, realizadoEm: { gte: inicio, lt: fim } },
+      select: { realizadoEm: true },
+    }),
+    prismaNutri.registroAgua.findMany({
+      where: { clienteId, registradoEm: { gte: inicio, lt: fim } },
+      select: { registradoEm: true },
+    }),
+  ]);
+
+  const dias = Array<boolean>(7).fill(false);
+  const marcar = (d: Date) => {
+    dias[indiceDiaSemana(d)] = true;
+  };
+  for (const r of refeicoes) marcar(r.registradoEm);
+  for (const s of sessoes) marcar(s.realizadoEm);
+  for (const a of aguas) marcar(a.registradoEm);
+
+  return { dias, hoje: indiceDiaSemana(new Date()) };
+}
+
 /** Recados que os profissionais mandaram pro cliente, mais recentes primeiro. */
 async function montarRecados(clienteId: string): Promise<RecadoDoCliente[]> {
   const recados = await prismaNutri.recado.findMany({
@@ -181,7 +224,7 @@ export async function buscarPainelDoCliente(cliente: Cliente): Promise<PainelDoC
   const { ativos, pendentes, temNutricao, temTreino } = await vinculosVivos(cliente.id);
   const { inicio: inicioHoje, fim: fimHoje } = limitesDoDiaEmSaoPaulo();
 
-  const [nutricao, treino, aguaHoje, ofensiva, recados] = await Promise.all([
+  const [nutricao, treino, aguaHoje, ofensiva, recados, semana] = await Promise.all([
     temNutricao ? montarBlocoNutricao(cliente.id, inicioHoje, fimHoje) : Promise.resolve(null),
     temTreino ? montarBlocoTreino(cliente.id, inicioHoje, fimHoje) : Promise.resolve(null),
     prismaNutri.registroAgua.findMany({
@@ -190,6 +233,7 @@ export async function buscarPainelDoCliente(cliente: Cliente): Promise<PainelDoC
     }),
     montarOfensiva(cliente.id),
     montarRecados(cliente.id),
+    montarSemana(cliente.id),
   ]);
 
   const hidratacao = calcularHidratacao(aguaHoje, cliente.metaAguaMl);
@@ -200,6 +244,7 @@ export async function buscarPainelDoCliente(cliente: Cliente): Promise<PainelDoC
     treino,
     hidratacao,
     ofensiva,
+    semana,
     recados,
     vinculosAtivos: ativos,
     solicitacoes: pendentes,
