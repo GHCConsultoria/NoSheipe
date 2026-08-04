@@ -12,6 +12,7 @@ import {
   fotoPerfilSchema,
   inscricaoPushSchema,
   registrarAguaSchema,
+  registrarCorridaSchema,
   registrarPesoSchema,
   registrarSchema,
   removerFavoritoSchema,
@@ -422,6 +423,52 @@ export async function ajustarRefeicao(input: unknown): Promise<ResultadoAcaoPubl
   });
 
   revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Registra uma corrida (distância + tempo). Guarda em metros e segundos —
+ * o pace e os recordes derivam disso, nunca de um número já calculado.
+ */
+export async function registrarCorrida(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = registrarCorridaSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "valores inválidos" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+  if (!cliente.consentimentoEm) return { sucesso: false, erro: "consentimento obrigatório antes de registrar" };
+
+  await prismaNutri.corrida.create({
+    data: {
+      clienteId: cliente.id,
+      distanciaMetros: Math.round(parsed.data.distanciaKm * 1000),
+      duracaoSegundos: Math.round(parsed.data.duracaoMin * 60),
+    },
+  });
+
+  revalidatePath(`/p/${parsed.data.token}/treino`);
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/** Remove uma corrida registrada errada — remoção lógica, como refeição/treino. */
+export async function removerCorrida(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = removerRegistroSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const corrida = await prismaNutri.corrida.findFirst({
+    where: { id: parsed.data.registroId, clienteId: cliente.id },
+  });
+  if (!corrida) return { sucesso: false, erro: "registro não encontrado" };
+
+  await prismaNutri.corrida.update({ where: { id: corrida.id }, data: { removidoEm: new Date() } });
+
+  revalidatePath(`/p/${parsed.data.token}/treino`);
   return { sucesso: true };
 }
 

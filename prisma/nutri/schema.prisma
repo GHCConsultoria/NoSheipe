@@ -121,6 +121,7 @@ model Cliente {
   sessoesTreino       SessaoTreino[]
   medidas             Medida[]
   registrosAgua       RegistroAgua[]
+  corridas            Corrida[]
   anotacoes           Anotacao[]
   recados             Recado[]
   inscricoesPush      PushSubscription[]
@@ -282,6 +283,26 @@ model Medida {
   registradoEm DateTime @default(now())
 
   @@map("medidas")
+}
+
+/// Uma corrida do cliente — distância e tempo, de onde sai o pace e os
+/// recordes pessoais (a gamificação de corrida, começando pelo "KOM contra
+/// você mesmo"). Guarda em metros e segundos (inteiros) pra a conta do pace
+/// não acumular erro de ponto flutuante. Remoção lógica como refeição/treino.
+model Corrida {
+  id String @id @default(cuid())
+
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  clienteId String
+
+  distanciaMetros Int
+  duracaoSegundos Int
+
+  realizadoEm DateTime  @default(now())
+  removidoEm  DateTime?
+
+  @@index([clienteId])
+  @@map("corridas")
 }
 
 /// Copo d'água que o cliente registrou. Um toque = uma linha, para o total

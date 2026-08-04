@@ -57,6 +57,12 @@ function criarPrismaNutri() {
           return query(args);
         },
       },
+      corrida: {
+        $allOperations({ operation, args, query }) {
+          ocultarRemovidos(operation, args);
+          return query(args);
+        },
+      },
     },
   });
 }

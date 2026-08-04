@@ -10,6 +10,7 @@ import {
 import { calcularAderenciaTreino, type AderenciaTreino } from "@/lib/personal/aderencia";
 import { calcularHidratacao, type Hidratacao } from "@/lib/cliente/hidratacao";
 import { calcularOfensiva, type Ofensiva } from "@/lib/cliente/ofensiva";
+import { calcularRecordes, paceSegundosPorKm, type Recordes } from "@/lib/cliente/corrida";
 
 export async function buscarClientePorToken(token: string) {
   const cliente = await prismaNutri.cliente.findUnique({ where: { tokenAcesso: token } });
@@ -420,6 +421,45 @@ export async function buscarTreinoDoCliente(clienteId: string, dias = 14): Promi
       entradaBruta: s.entradaBruta,
       dia: FORMATADOR_DIA.format(s.realizadoEm),
       horario: FORMATADOR_HORA.format(s.realizadoEm),
+    })),
+  };
+}
+
+export interface CorridaDoCliente {
+  id: string;
+  distanciaMetros: number;
+  duracaoSegundos: number;
+  paceSegKm: number;
+  dia: string;
+  horario: string;
+}
+
+export interface CorridasDados {
+  recordes: Recordes;
+  corridas: CorridaDoCliente[];
+}
+
+/**
+ * Corridas do cliente + recordes pessoais. Os recordes olham TODO o
+ * histórico (take alto); a lista mostra só as mais recentes. Pace derivado
+ * na hora a partir de metros/segundos.
+ */
+export async function buscarCorridasDoCliente(clienteId: string): Promise<CorridasDados> {
+  const corridas = await prismaNutri.corrida.findMany({
+    where: { clienteId },
+    orderBy: { realizadoEm: "desc" },
+    take: 200,
+  });
+
+  return {
+    recordes: calcularRecordes(corridas),
+    corridas: corridas.slice(0, 12).map((c) => ({
+      id: c.id,
+      distanciaMetros: c.distanciaMetros,
+      duracaoSegundos: c.duracaoSegundos,
+      paceSegKm: paceSegundosPorKm(c.distanciaMetros, c.duracaoSegundos),
+      dia: FORMATADOR_DIA.format(c.realizadoEm),
+      horario: FORMATADOR_HORA.format(c.realizadoEm),
     })),
   };
 }
