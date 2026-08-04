@@ -2,15 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Trophy, X } from "lucide-react";
-import { registrarCorrida, registrarTreino, removerCorrida, removerSessaoTreino } from "@/lib/cliente/publico";
+import { Crown, Trophy, X } from "lucide-react";
+import {
+  entrarNoRanking,
+  registrarCorrida,
+  registrarTreino,
+  removerCorrida,
+  removerSessaoTreino,
+  sairDoRanking,
+} from "@/lib/cliente/publico";
 import {
   DISTANCIA_MINIMA_RECORDE_METROS,
   formatarDuracao,
   formatarPace,
   paceSegundosPorKm,
 } from "@/lib/cliente/corrida";
-import type { CorridasDados, TreinoDoClienteDados } from "@/lib/cliente/consultas";
+import type { CorridasDados, RankingRBP, TreinoDoClienteDados } from "@/lib/cliente/consultas";
 
 /**
  * Aba Treino do cliente: o treino prescrito ativo, a aderência da semana e o
@@ -23,7 +30,8 @@ export function TreinoDoCliente({
   aderenciaSemana,
   sessoes,
   corridas,
-}: TreinoDoClienteDados & { token: string; corridas: CorridasDados }) {
+  ranking,
+}: TreinoDoClienteDados & { token: string; corridas: CorridasDados; ranking: RankingRBP }) {
   const router = useRouter();
   const [texto, setTexto] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -72,6 +80,8 @@ export function TreinoDoCliente({
       )}
 
       <BlocoCorrida token={token} corridas={corridas} />
+
+      <BlocoRanking token={token} ranking={ranking} />
 
       <section className="mt-8">
         <h2 className="eyebrow mb-3">Registrar treino</h2>
@@ -275,5 +285,116 @@ function Recorde({ rotulo, valor }: { rotulo: string; valor: string }) {
       <div className="font-data text-sm text-treino">{valor}</div>
       <div className="eyebrow mt-0.5 text-[0.6rem]">{rotulo}</div>
     </div>
+  );
+}
+
+const MES_ATUAL = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", month: "long" }).format(new Date());
+
+/**
+ * Ranking RBP (Run Best Player): quem correu mais km no mês, entre quem
+ * OPTOU por participar, aparecendo pelo apelido. Fora do ranking, mostra só
+ * o convite pra entrar (opt-in) — nada de dado de ninguém aparece antes.
+ * Zera todo mês: chance nova de ser o RBP.
+ */
+function BlocoRanking({ token, ranking }: { token: string; ranking: RankingRBP }) {
+  const router = useRouter();
+  const [apelido, setApelido] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [pendente, iniciarTransicao] = useTransition();
+
+  function agir(acao: () => Promise<{ sucesso: boolean; erro?: string }>) {
+    setErro(null);
+    iniciarTransicao(async () => {
+      const r = await acao();
+      if (!r.sucesso) {
+        setErro(r.erro ?? "não deu — tente de novo");
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <section className="mt-8">
+      <h2 className="eyebrow mb-3 flex items-center gap-1.5">
+        <Crown size={13} strokeWidth={1.75} className="text-attention" /> Ranking RBP · {MES_ATUAL}
+      </h2>
+
+      {!ranking.participa ? (
+        <div className="paper-card flex flex-col gap-3 rounded-sm p-4">
+          <p className="text-sm text-ink-soft">
+            Entre no <span className="font-medium">Run Best Player</span> e dispute os km do mês com a galera. Você
+            aparece só pelo apelido — nunca pelo seu nome.
+          </p>
+          <input
+            type="text"
+            value={apelido}
+            onChange={(e) => setApelido(e.target.value)}
+            maxLength={20}
+            placeholder="seu apelido no ranking"
+            className="w-full rounded-sm border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-treino"
+          />
+          {erro && <p className="text-sm text-urgent">{erro}</p>}
+          <button
+            type="button"
+            disabled={pendente || apelido.trim().length < 2}
+            onClick={() => agir(() => entrarNoRanking({ token, apelido }))}
+            className="tatil self-start rounded-sm bg-treino px-4 py-2 text-sm font-medium text-treino-on shadow-sm transition-colors hover:opacity-90 disabled:opacity-50"
+          >
+            Entrar no ranking
+          </button>
+        </div>
+      ) : (
+        <div className="paper-card flex flex-col gap-1 rounded-sm p-4">
+          {ranking.total === 0 ? (
+            <p className="py-2 text-sm text-ink-soft">Ninguém correu este mês ainda — corra e seja o primeiro RBP! 👑</p>
+          ) : (
+            <ul className="flex flex-col">
+              {ranking.top.map((e) => (
+                <LinhaRanking key={e.posicao} entrada={e} />
+              ))}
+              {ranking.minhaEntrada && ranking.minhaEntrada.posicao > 10 && (
+                <>
+                  <li className="py-1 text-center text-xs text-ink-faint">···</li>
+                  <LinhaRanking entrada={ranking.minhaEntrada} />
+                </>
+              )}
+            </ul>
+          )}
+          {ranking.participa && !ranking.minhaEntrada && ranking.total > 0 && (
+            <p className="mt-1 text-xs text-ink-faint">Você ainda não correu este mês — registre uma corrida pra entrar.</p>
+          )}
+          {erro && <p className="mt-2 text-sm text-urgent">{erro}</p>}
+          <button
+            type="button"
+            disabled={pendente}
+            onClick={() => agir(() => sairDoRanking({ token }))}
+            className="mt-2 self-start text-xs text-ink-faint underline underline-offset-2 transition-colors hover:text-urgent disabled:opacity-50"
+          >
+            sair do ranking
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function LinhaRanking({ entrada }: { entrada: { posicao: number; apelido: string; km: number; ehVoce: boolean } }) {
+  const medalha = entrada.posicao === 1 ? "🥇" : entrada.posicao === 2 ? "🥈" : entrada.posicao === 3 ? "🥉" : null;
+  return (
+    <li
+      className={`flex items-center gap-3 rounded-sm px-2 py-1.5 text-sm ${
+        entrada.ehVoce ? "border border-treino font-medium" : ""
+      }`}
+    >
+      <span className="w-6 shrink-0 text-center font-data text-xs text-ink-faint">
+        {medalha ?? entrada.posicao}
+      </span>
+      <span className="min-w-0 flex-1 truncate">
+        {entrada.apelido}
+        {entrada.ehVoce && <span className="ml-1 text-xs text-treino">(você)</span>}
+      </span>
+      <span className="font-data text-sm text-treino">{entrada.km} km</span>
+    </li>
   );
 }

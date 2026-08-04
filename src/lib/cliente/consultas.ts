@@ -11,6 +11,7 @@ import { calcularAderenciaTreino, type AderenciaTreino } from "@/lib/personal/ad
 import { calcularHidratacao, type Hidratacao } from "@/lib/cliente/hidratacao";
 import { calcularOfensiva, type Ofensiva } from "@/lib/cliente/ofensiva";
 import { calcularRecordes, paceSegundosPorKm, type Recordes } from "@/lib/cliente/corrida";
+import { ordenarRanking, type EntradaRanking } from "@/lib/cliente/ranking";
 
 export async function buscarClientePorToken(token: string) {
   const cliente = await prismaNutri.cliente.findUnique({ where: { tokenAcesso: token } });
@@ -461,6 +462,59 @@ export async function buscarCorridasDoCliente(clienteId: string): Promise<Corrid
       dia: FORMATADOR_DIA.format(c.realizadoEm),
       horario: FORMATADOR_HORA.format(c.realizadoEm),
     })),
+  };
+}
+
+export interface RankingRBP {
+  participa: boolean;
+  apelido: string | null;
+  /** Top 10 do mês. */
+  top: EntradaRanking[];
+  /** A entrada do próprio cliente (mesmo fora do top 10), ou null se não correu. */
+  minhaEntrada: EntradaRanking | null;
+  total: number;
+}
+
+/**
+ * Ranking RBP do mês: soma de km por cliente que OPTOU por participar, no
+ * mês-calendário em São Paulo. Só entra quem tem participaRanking, e aparece
+ * pelo apelido — nunca o nome real. A agregação é em memória (cedo, o volume
+ * é pequeno); depois vira uma soma no banco se precisar.
+ */
+export async function buscarRankingRBP(cliente: {
+  id: string;
+  participaRanking: boolean;
+  apelidoRanking: string | null;
+}): Promise<RankingRBP> {
+  // Início do mês-calendário em SP (dia 01, 00:00 local), via o helper de dia.
+  const chave = CHAVE_DIA_SP.format(new Date()); // yyyy-mm-dd
+  const primeiroDoMes = new Date(`${chave.slice(0, 7)}-01T12:00:00.000Z`);
+  const { inicio } = limitesDoDiaEmSaoPaulo(primeiroDoMes);
+
+  const corridas = await prismaNutri.corrida.findMany({
+    where: { realizadoEm: { gte: inicio }, cliente: { participaRanking: true } },
+    select: { clienteId: true, distanciaMetros: true, cliente: { select: { apelidoRanking: true } } },
+  });
+
+  const porCliente = new Map<string, { apelido: string; metros: number }>();
+  for (const c of corridas) {
+    const apelido = c.cliente.apelidoRanking ?? "Anônimo";
+    const atual = porCliente.get(c.clienteId);
+    if (atual) atual.metros += c.distanciaMetros;
+    else porCliente.set(c.clienteId, { apelido, metros: c.distanciaMetros });
+  }
+
+  const ordenado = ordenarRanking(
+    Array.from(porCliente, ([clienteId, v]) => ({ clienteId, apelido: v.apelido, metros: v.metros })),
+    cliente.id,
+  );
+
+  return {
+    participa: cliente.participaRanking,
+    apelido: cliente.apelidoRanking,
+    top: ordenado.slice(0, 10),
+    minhaEntrada: ordenado.find((e) => e.ehVoce) ?? null,
+    total: ordenado.length,
   };
 }
 

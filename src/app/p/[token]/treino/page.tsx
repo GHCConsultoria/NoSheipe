@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import {
   buscarClientePorToken,
   buscarCorridasDoCliente,
+  buscarRankingRBP,
   buscarResumoDaNavegacao,
   buscarTreinoDoCliente,
 } from "@/lib/cliente/consultas";
@@ -24,9 +25,10 @@ export default async function PaginaTreinoDoCliente({ params }: { params: { toke
     notFound();
   }
 
-  const [dados, corridas] = await Promise.all([
+  const [dados, corridas, ranking] = await Promise.all([
     buscarTreinoDoCliente(cliente.id),
     buscarCorridasDoCliente(cliente.id),
+    buscarRankingRBP(cliente),
   ]);
-  return <TreinoDoCliente token={cliente.tokenAcesso} corridas={corridas} {...dados} />;
+  return <TreinoDoCliente token={cliente.tokenAcesso} corridas={corridas} ranking={ranking} {...dados} />;
 }

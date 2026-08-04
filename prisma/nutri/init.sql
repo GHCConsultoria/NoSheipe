@@ -399,6 +399,12 @@ ALTER TABLE "clientes" ADD COLUMN "metaAguaMl" INTEGER NOT NULL DEFAULT 2000;
 -- mesmo jeito que os ALTERs acima.
 ALTER TABLE "clientes" ADD COLUMN "fotoBase64" TEXT;
 
+-- AlterTable
+-- Ranking RBP: opt-in + apelido público. Idempotente (tolera "duplicate
+-- column" na 2ª passada).
+ALTER TABLE "clientes" ADD COLUMN "participaRanking" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "clientes" ADD COLUMN "apelidoRanking" TEXT;
+
 -- CreateTable
 CREATE TABLE IF NOT EXISTS "registros_agua" (
     "id" TEXT NOT NULL PRIMARY KEY,
