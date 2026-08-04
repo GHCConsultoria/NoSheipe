@@ -150,6 +150,15 @@ export const templateTreinoSchema = z.object({ nome: nomeTemplate, treino: trein
 
 export const removerTemplateSchema = z.object({ templateId: z.string().min(1) });
 
+/** Oferta do Marketplace. Preço em reais na entrada; vira centavos na ação. */
+export const criarOfertaSchema = z.object({
+  titulo: z.string().trim().min(1, "dê um título").max(80, "título longo demais"),
+  descricao: z.string().trim().min(1, "descreva a oferta").max(500, "descrição longa demais"),
+  precoReais: z.coerce.number().nonnegative("preço não pode ser negativo").max(100000, "preço fora do plausível"),
+});
+
+export const removerOfertaSchema = z.object({ ofertaId: z.string().min(1) });
+
 export const tokenSchema = z.object({ token: z.string().min(1) });
 
 export const registrarPesoSchema = tokenSchema.extend({
@@ -197,6 +206,20 @@ export const registrarSchema = tokenSchema.extend({
 export const registrarCorridaSchema = tokenSchema.extend({
   distanciaKm: z.coerce.number().positive("distância deve ser positiva").max(500, "distância fora do plausível"),
   duracaoMin: z.coerce.number().positive("tempo deve ser positivo").max(1440, "tempo fora do plausível"),
+});
+
+/**
+ * @usuário público — minúsculo, sem espaço, começando com letra. É o
+ * identificador que o cliente escolhe pra si (à parte do nome).
+ */
+export const definirUsuarioSchema = tokenSchema.extend({
+  usuario: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3, "mínimo 3 caracteres")
+    .max(20, "máximo 20 caracteres")
+    .regex(/^[a-z][a-z0-9._]*$/, "letras, números, . e _ — começando com letra"),
 });
 
 /** Entrar no ranking RBP: escolhe o apelido público (nunca o nome real). */

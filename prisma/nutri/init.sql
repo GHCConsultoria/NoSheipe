@@ -405,6 +405,13 @@ ALTER TABLE "clientes" ADD COLUMN "fotoBase64" TEXT;
 ALTER TABLE "clientes" ADD COLUMN "participaRanking" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "clientes" ADD COLUMN "apelidoRanking" TEXT;
 
+-- AlterTable
+-- @usuário público do cliente. Idempotente como os ALTERs acima.
+ALTER TABLE "clientes" ADD COLUMN "usuario" TEXT;
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "clientes_usuario_key" ON "clientes"("usuario");
+
 -- CreateTable
 CREATE TABLE IF NOT EXISTS "registros_agua" (
     "id" TEXT NOT NULL PRIMARY KEY,
@@ -505,3 +512,23 @@ CREATE TABLE IF NOT EXISTS "corridas" (
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "corridas_clienteId_idx" ON "corridas"("clienteId");
+
+
+-- ============================================================
+-- Ofertas do Marketplace: produtos avulsos do profissional.
+-- ============================================================
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "ofertas" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "profissionalId" TEXT NOT NULL,
+    "titulo" TEXT NOT NULL,
+    "descricao" TEXT NOT NULL,
+    "precoCentavos" INTEGER NOT NULL,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ofertas_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "profissionais" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "ofertas_profissionalId_idx" ON "ofertas"("profissionalId");

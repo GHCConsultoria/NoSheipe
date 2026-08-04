@@ -132,7 +132,7 @@ const DIAS_JANELA_OFENSIVA = 400;
  * (refeição, treino ou água). Junta só os carimbos de data das três tabelas
  * numa janela larga e delega a contagem à função pura.
  */
-async function montarOfensiva(clienteId: string): Promise<Ofensiva> {
+export async function montarOfensiva(clienteId: string): Promise<Ofensiva> {
   const desde = new Date(Date.now() - DIAS_JANELA_OFENSIVA * 24 * 60 * 60 * 1000);
 
   const [refeicoes, sessoes, aguas] = await Promise.all([
@@ -516,6 +516,44 @@ export async function buscarRankingRBP(cliente: {
     minhaEntrada: ordenado.find((e) => e.ehVoce) ?? null,
     total: ordenado.length,
   };
+}
+
+const FORMATADOR_PRECO = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+export interface OfertaParaCliente {
+  id: string;
+  titulo: string;
+  descricao: string;
+  preco: string;
+  profissionalNome: string;
+}
+
+/**
+ * Ofertas do Marketplace que o cliente vê: as dos profissionais que o
+ * acompanham (vínculo ativo). Nada de vitrine de estranho no v1 — o que
+ * aparece é do time dele.
+ */
+export async function buscarOfertasParaCliente(clienteId: string): Promise<OfertaParaCliente[]> {
+  const vinculos = await prismaNutri.vinculo.findMany({
+    where: { clienteId, status: StatusVinculo.ATIVO },
+    select: { profissionalId: true },
+  });
+  const profissionaisIds = Array.from(new Set(vinculos.map((v) => v.profissionalId)));
+  if (profissionaisIds.length === 0) return [];
+
+  const ofertas = await prismaNutri.oferta.findMany({
+    where: { ativo: true, profissionalId: { in: profissionaisIds } },
+    include: { profissional: { select: { nome: true } } },
+    orderBy: { criadoEm: "desc" },
+  });
+
+  return ofertas.map((o) => ({
+    id: o.id,
+    titulo: o.titulo,
+    descricao: o.descricao,
+    preco: FORMATADOR_PRECO.format(o.precoCentavos / 100),
+    profissionalNome: o.profissional.nome,
+  }));
 }
 
 export async function buscarPesoDoCliente(clienteId: string, dias = 90) {

@@ -3,6 +3,7 @@ import { buscarClientePorToken, buscarPainelDoCliente } from "@/lib/cliente/cons
 import { MeusProfissionais, SolicitacoesPendentes } from "@/components/cliente/MeusProfissionais";
 import { MeusDadosLGPD } from "@/components/cliente/MeusDadosLGPD";
 import { FotoPerfilUpload } from "@/components/cliente/FotoPerfilUpload";
+import { UsuarioPerfil } from "@/components/cliente/UsuarioPerfil";
 import { ThemeToggle } from "@/components/nutri/ThemeToggle";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,8 @@ export default async function PerfilDoCliente({ params }: { params: { token: str
   return (
     <main className="mx-auto max-w-md px-6 py-10">
       <FotoPerfilUpload token={cliente.tokenAcesso} nome={cliente.nome} fotoUrl={cliente.fotoBase64} />
+
+      <UsuarioPerfil token={cliente.tokenAcesso} usuarioInicial={cliente.usuario} />
 
       <div className="mt-6" />
       <SolicitacoesPendentes token={cliente.tokenAcesso} solicitacoes={painel.solicitacoes} />

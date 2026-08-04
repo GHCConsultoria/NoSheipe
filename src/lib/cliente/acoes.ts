@@ -21,7 +21,9 @@ import {
   atualizarTreinoSchema,
   clienteIdSchema,
   criarClienteSchema,
+  criarOfertaSchema,
   recadoSchema,
+  removerOfertaSchema,
   removerTemplateSchema,
   solicitarVinculoSchema,
   templateNutricaoSchema,
@@ -289,6 +291,39 @@ export async function salvarTemplateTreino(input: unknown): Promise<ResultadoAca
   });
 
   revalidatePath("/pro", "layout");
+  return { sucesso: true };
+}
+
+/** Publica uma oferta no Marketplace. Preço vem em reais e vira centavos. */
+export async function criarOferta(input: unknown): Promise<ResultadoAcao> {
+  const parsed = criarOfertaSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+
+  const profissional = await obterProfissionalAtual();
+  await prismaNutri.oferta.create({
+    data: {
+      profissionalId: profissional.id,
+      titulo: parsed.data.titulo,
+      descricao: parsed.data.descricao,
+      precoCentavos: Math.round(parsed.data.precoReais * 100),
+    },
+  });
+
+  revalidatePath("/pro/conta");
+  return { sucesso: true };
+}
+
+/** Remove uma oferta — só as do próprio profissional (filtro por profissionalId). */
+export async function removerOferta(input: unknown): Promise<ResultadoAcao> {
+  const parsed = removerOfertaSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "payload inválido" };
+
+  const profissional = await obterProfissionalAtual();
+  await prismaNutri.oferta.deleteMany({ where: { id: parsed.data.ofertaId, profissionalId: profissional.id } });
+
+  revalidatePath("/pro/conta");
   return { sucesso: true };
 }
 

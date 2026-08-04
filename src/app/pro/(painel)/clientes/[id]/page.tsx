@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { obterProfissionalAtual } from "@/lib/profissional/auth";
 import { buscarComparacaoSemanas, buscarFichaDoCliente } from "@/lib/profissional/consultas";
+import { formatarPace } from "@/lib/cliente/corrida";
 import { EditorCliente } from "@/components/cliente/EditorCliente";
 import { ComparativoSemanas } from "@/components/profissional/ComparativoSemanas";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
@@ -81,6 +82,25 @@ export default async function FichaCliente({ params }: { params: { id: string } 
           )}
         </section>
       )}
+
+      <section className="paper-card mt-6 flex flex-col gap-2 rounded-sm p-6 text-sm">
+        <h2 className="eyebrow mb-1">Engajamento</h2>
+        <Linha rotulo="Ofensiva" valor={`${ficha.engajamento.ofensivaDias} ${ficha.engajamento.ofensivaDias === 1 ? "dia seguido" : "dias seguidos"}`} />
+        {ficha.engajamento.corrida && ficha.engajamento.corrida.quantidade > 0 && (
+          <>
+            <Linha
+              rotulo="Corrida"
+              valor={`${ficha.engajamento.corrida.km} km em ${ficha.engajamento.corrida.quantidade} corrida${ficha.engajamento.corrida.quantidade === 1 ? "" : "s"}`}
+            />
+            {ficha.engajamento.corrida.melhorPaceSegKm && (
+              <Linha rotulo="Melhor pace" valor={formatarPace(ficha.engajamento.corrida.melhorPaceSegKm)} />
+            )}
+          </>
+        )}
+        {ficha.engajamento.coposAgua7d !== null && (
+          <Linha rotulo="Água (7 dias)" valor={`${ficha.engajamento.coposAgua7d} copos`} />
+        )}
+      </section>
 
       <ComparativoSemanas comparacao={comparacao} />
 

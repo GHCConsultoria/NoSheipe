@@ -12,6 +12,8 @@ import {
 } from "@/lib/nutri/aderencia";
 import { calcularAderenciaTreino, estaForaDoTreino, type AderenciaTreino } from "@/lib/personal/aderencia";
 import { comparar, type Comparacao } from "@/lib/profissional/comparacao";
+import { montarOfensiva } from "@/lib/cliente/consultas";
+import { calcularRecordes } from "@/lib/cliente/corrida";
 
 function diasDesde(data: Date | null | undefined): number | null {
   if (!data) return null;
@@ -129,6 +131,14 @@ export interface FichaDoCliente {
   anamneseNutricional: Awaited<ReturnType<typeof prismaNutri.anamneseNutricional.findUnique>>;
   anamneseTreino: Awaited<ReturnType<typeof prismaNutri.anamneseTreino.findUnique>>;
   anotacoes: { id: string; texto: string; criadoEm: Date }[];
+  /** Engajamento do cliente com o app — respeitando o isolamento por vínculo. */
+  engajamento: {
+    ofensivaDias: number;
+    /** Só pra quem acompanha o treino. */
+    corrida: { km: number; melhorPaceSegKm: number | null; quantidade: number } | null;
+    /** Só pra quem acompanha a nutrição: copos d'água nos últimos 7 dias. */
+    coposAgua7d: number | null;
+  };
   recados: { id: string; texto: string; criadoEm: Date; lido: boolean }[];
   pesos: { pesoKg: number; registradoEm: Date }[];
   templatesNutricao: { id: string; nome: string; metaKcal: number; metaProteina: number; metaCarbo: number; metaGordura: number }[];
@@ -151,9 +161,22 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
 
   const acompanhaNutricao = vinculos.some((v) => v.tipo === TipoVinculo.NUTRICAO);
   const acompanhaTreino = vinculos.some((v) => v.tipo === TipoVinculo.TREINO);
+  const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const [plano, treino, anamneseNutricional, anamneseTreino, anotacoes, recados, pesos, templatesNutricao, templatesTreino] =
-    await Promise.all([
+  const [
+    plano,
+    treino,
+    anamneseNutricional,
+    anamneseTreino,
+    anotacoes,
+    recados,
+    pesos,
+    templatesNutricao,
+    templatesTreino,
+    ofensiva,
+    corridasRaw,
+    aguaSemana,
+  ] = await Promise.all([
     acompanhaNutricao
       ? prismaNutri.planoNutricional.findFirst({ where: { clienteId, ativo: true }, orderBy: { criadoEm: "desc" } })
       : null,
@@ -183,7 +206,20 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
           orderBy: { criadoEm: "desc" },
         })
       : [],
+    // Ofensiva é sinal geral de engajamento — vale pros dois lados.
+    montarOfensiva(clienteId),
+    // Corrida só pra quem acompanha o treino (isolamento).
+    acompanhaTreino ? prismaNutri.corrida.findMany({ where: { clienteId }, take: 200 }) : [],
+    // Água só pra quem acompanha a nutrição.
+    acompanhaNutricao
+      ? prismaNutri.registroAgua.findMany({
+          where: { clienteId, registradoEm: { gte: seteDiasAtras } },
+          select: { id: true },
+        })
+      : [],
   ]);
+
+  const recordesCorrida = calcularRecordes(corridasRaw);
 
   return {
     cliente,
@@ -201,6 +237,17 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
     anamneseNutricional,
     anamneseTreino,
     anotacoes: anotacoes.map((a) => ({ id: a.id, texto: a.texto, criadoEm: a.criadoEm })),
+    engajamento: {
+      ofensivaDias: ofensiva.dias,
+      corrida: acompanhaTreino
+        ? {
+            km: Math.round(recordesCorrida.totalMetros / 100) / 10,
+            melhorPaceSegKm: recordesCorrida.melhorPaceSegKm,
+            quantidade: recordesCorrida.quantidade,
+          }
+        : null,
+      coposAgua7d: acompanhaNutricao ? aguaSemana.length : null,
+    },
     recados: recados.map((r) => ({ id: r.id, texto: r.texto, criadoEm: r.criadoEm, lido: r.lidoEm !== null })),
     pesos: pesos.map((p) => ({ pesoKg: p.pesoKg, registradoEm: p.registradoEm })),
     templatesNutricao: templatesNutricao.map((t) => ({
@@ -297,6 +344,29 @@ async function compararTreino(clienteId: string, inicioAnterior: Date, inicioAtu
     sessoes: comparar(atual.length, anterior.length),
     dias: comparar(diasDistintos(atual.map((s) => s.realizadoEm)), diasDistintos(anterior.map((s) => s.realizadoEm))),
   };
+}
+
+const FORMATADOR_PRECO = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+export interface OfertaDoProfissional {
+  id: string;
+  titulo: string;
+  descricao: string;
+  preco: string;
+}
+
+/** Ofertas ativas do profissional, pra ele gerenciar no /pro/conta. */
+export async function buscarOfertasDoProfissional(profissionalId: string): Promise<OfertaDoProfissional[]> {
+  const ofertas = await prismaNutri.oferta.findMany({
+    where: { profissionalId, ativo: true },
+    orderBy: { criadoEm: "desc" },
+  });
+  return ofertas.map((o) => ({
+    id: o.id,
+    titulo: o.titulo,
+    descricao: o.descricao,
+    preco: FORMATADOR_PRECO.format(o.precoCentavos / 100),
+  }));
 }
 
 /** Vínculos ativos contam a vaga do plano — pendentes ainda não. */
