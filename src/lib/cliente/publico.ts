@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "../../../prisma/nutri/generated";
 import { prismaNutri } from "@/lib/nutri/prisma";
 import { extrairMacros, IaRespostaInvalidaError } from "@/lib/nutri/ia";
 import {
@@ -8,6 +9,7 @@ import {
   StatusVinculo,
   ajustarMacrosSchema,
   definirMetaAguaSchema,
+  definirUsuarioSchema,
   entrarRankingSchema,
   favoritoSchema,
   fotoPerfilSchema,
@@ -222,6 +224,29 @@ export async function removerUltimaAgua(input: unknown): Promise<ResultadoAcaoPu
   await prismaNutri.registroAgua.delete({ where: { id: ultimo.id } });
 
   revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/** O cliente escolhe/troca o próprio @usuário. Único: se já existir, avisa. */
+export async function definirUsuario(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = definirUsuarioSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "@usuário inválido" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  try {
+    await prismaNutri.cliente.update({ where: { id: cliente.id }, data: { usuario: parsed.data.usuario } });
+  } catch (erro) {
+    if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2002") {
+      return { sucesso: false, erro: "esse @usuário já está em uso — escolha outro" };
+    }
+    throw erro;
+  }
+
+  revalidatePath(`/p/${parsed.data.token}/perfil`);
   return { sucesso: true };
 }
 

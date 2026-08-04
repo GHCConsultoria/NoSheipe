@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { obterProfissionalAtual } from "@/lib/profissional/auth";
-import { contarVinculosAtivos } from "@/lib/profissional/consultas";
+import { buscarOfertasDoProfissional, contarVinculosAtivos } from "@/lib/profissional/consultas";
 import { NumeroAnimado } from "@/components/shared/NumeroAnimado";
+import { GerenciarOfertas } from "@/components/profissional/GerenciarOfertas";
 import { ThemeToggle } from "@/components/nutri/ThemeToggle";
 import { sairProfissional } from "../../login/actions";
 
@@ -28,7 +29,10 @@ const FORMATADOR_DATA = new Intl.DateTimeFormat("pt-BR", {
  */
 export default async function ContaDoProfissional() {
   const profissional = await obterProfissionalAtual();
-  const ativos = await contarVinculosAtivos(profissional.id);
+  const [ativos, ofertas] = await Promise.all([
+    contarVinculosAtivos(profissional.id),
+    buscarOfertasDoProfissional(profissional.id),
+  ]);
 
   const atuacoes = [
     profissional.ehNutricionista && `Nutricionista${profissional.crn ? ` · ${profissional.crn}` : ""}`,
@@ -71,6 +75,8 @@ export default async function ContaDoProfissional() {
           Um cliente que você acompanha nos dois lados ocupa duas vagas — nutrição e treino contam separado.
         </p>
       </section>
+
+      <GerenciarOfertas ofertas={ofertas} />
 
       {profissional.ehMaster && (
         <section className="paper-card mt-4 rounded-sm p-5">

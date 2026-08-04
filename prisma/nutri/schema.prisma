@@ -59,6 +59,7 @@ model Profissional {
   anotacoes Anotacao[]
   recados   Recado[]
   templates Template[]
+  ofertas   Oferta[]
 
   // Obsoletos: donos da era Paciente/Aluno, antes do Cliente unificado.
   pacientes Paciente[]
@@ -119,6 +120,10 @@ model Cliente {
   // nem contado. Dado de saúde é sensível; competição pública é escolha.
   participaRanking Boolean @default(false)
   apelidoRanking   String?
+
+  // @usuário escolhido pelo cliente — o identificador público dele no app,
+  // à parte do nome. Opcional; único quando definido.
+  usuario String? @unique
 
   vinculos            Vinculo[]
   planosNutricionais  PlanoNutricional[]
@@ -367,6 +372,29 @@ model Recado {
 
   @@index([clienteId])
   @@map("recados")
+}
+
+/// Oferta do profissional no Marketplace — um produto avulso (treino/dieta
+/// avulsos, consultoria, etc.) que os clientes dele veem e podem contratar.
+/// Preço em centavos (inteiro) pra não ter erro de float. Checkout e
+/// cashback ficam pra quando o meio de pagamento for definido; por ora é a
+/// vitrine. Listagem própria do profissional — pode ser removida de fato.
+model Oferta {
+  id String @id @default(cuid())
+
+  profissional   Profissional @relation(fields: [profissionalId], references: [id])
+  profissionalId String
+
+  titulo        String
+  descricao     String
+  precoCentavos Int
+
+  ativo Boolean @default(true)
+
+  criadoEm DateTime @default(now())
+
+  @@index([profissionalId])
+  @@map("ofertas")
 }
 
 /// Modelo de prescrição salvo pelo profissional pra reusar em vários
