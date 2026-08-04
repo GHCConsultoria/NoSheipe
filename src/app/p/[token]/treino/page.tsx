@@ -1,5 +1,10 @@
 import { notFound } from "next/navigation";
-import { buscarClientePorToken, buscarResumoDaNavegacao, buscarTreinoDoCliente } from "@/lib/cliente/consultas";
+import {
+  buscarClientePorToken,
+  buscarCorridasDoCliente,
+  buscarResumoDaNavegacao,
+  buscarTreinoDoCliente,
+} from "@/lib/cliente/consultas";
 import { TreinoDoCliente } from "@/components/cliente/TreinoDoCliente";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +24,9 @@ export default async function PaginaTreinoDoCliente({ params }: { params: { toke
     notFound();
   }
 
-  const dados = await buscarTreinoDoCliente(cliente.id);
-  return <TreinoDoCliente token={cliente.tokenAcesso} {...dados} />;
+  const [dados, corridas] = await Promise.all([
+    buscarTreinoDoCliente(cliente.id),
+    buscarCorridasDoCliente(cliente.id),
+  ]);
+  return <TreinoDoCliente token={cliente.tokenAcesso} corridas={corridas} {...dados} />;
 }

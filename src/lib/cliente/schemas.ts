@@ -193,6 +193,12 @@ export const registrarSchema = tokenSchema.extend({
   origem: z.nativeEnum(OrigemRegistro).default(OrigemRegistro.TEXTO),
 });
 
+/** Uma corrida: distância em km e tempo em minutos (viram metros/segundos na ação). */
+export const registrarCorridaSchema = tokenSchema.extend({
+  distanciaKm: z.coerce.number().positive("distância deve ser positiva").max(500, "distância fora do plausível"),
+  duracaoMin: z.coerce.number().positive("tempo deve ser positivo").max(1440, "tempo fora do plausível"),
+});
+
 /**
  * Registro de refeição por FOTO. A imagem vai em base64 (sem o prefixo
  * data:) e o mediaType diz o formato. Teto de ~9 MB de base64 (~6,5 MB de

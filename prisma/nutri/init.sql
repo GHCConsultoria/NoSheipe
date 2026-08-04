@@ -479,3 +479,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS "push_subscriptions_endpoint_key" ON "push_sub
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "push_subscriptions_clienteId_idx" ON "push_subscriptions"("clienteId");
+
+
+-- ============================================================
+-- Corridas: distância + tempo, base do pace e dos recordes
+-- pessoais (gamificação de corrida, Fase A).
+-- ============================================================
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "corridas" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clienteId" TEXT NOT NULL,
+    "distanciaMetros" INTEGER NOT NULL,
+    "duracaoSegundos" INTEGER NOT NULL,
+    "realizadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "removidoEm" DATETIME,
+    CONSTRAINT "corridas_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "clientes" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "corridas_clienteId_idx" ON "corridas"("clienteId");
