@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Camera, MessageCircle, Mic, Square, X } from "lucide-react";
 import { reconhecimentoDeFalaDisponivel, useReconhecimentoDeFala } from "@/components/shared/useReconhecimentoDeFala";
-import { CompartilharResumoDoDia } from "@/components/nutri/CompartilharResumoDoDia";
 import {
   ajustarRefeicao,
   estimarRefeicao,
@@ -18,7 +17,6 @@ import {
 import { AnelDoDia } from "@/components/cliente/AnelDoDia";
 import { ChamaDaSemana, LegendasDoDia, MacrosDoDia } from "@/components/cliente/PainelDoDia";
 import { GraficoPeso } from "@/components/cliente/GraficoPeso";
-import { FoguinhoFlutuante } from "@/components/cliente/FoguinhoFlutuante";
 import { GerenciarPush } from "@/components/cliente/GerenciarPush";
 
 interface SaldoMacro {
@@ -185,15 +183,9 @@ export function HomeDoCliente({
             <p className="mt-4 text-center text-sm text-attention">Seu personal ainda não prescreveu um treino.</p>
           )}
 
-          <ChamaDaSemana semana={semana} ofensiva={ofensiva} />
+          <ChamaDaSemana semana={semana} ofensiva={ofensiva} nome={nome} saldo={nutricao?.saldo ?? null} />
 
           {recados.length > 0 && <BlocoRecados token={token} recados={recados} />}
-
-          {nutricao && (
-            <div className="mt-6 flex justify-center">
-              <CompartilharResumoDoDia nomePaciente={nome} saldo={nutricao.saldo} />
-            </div>
-          )}
 
           <GerenciarPush token={token} chavePublica={chavePush} />
 
@@ -201,8 +193,6 @@ export function HomeDoCliente({
           {nutricao && (
             <BlocoPeso token={token} ultimoPesoKg={nutricao.ultimoPesoKg} pesoSerie={nutricao.pesoSerie} />
           )}
-
-          <FoguinhoFlutuante nome={nome} saldo={nutricao?.saldo ?? null} ofensivaDias={ofensiva.dias} />
         </>
       )}
     </main>

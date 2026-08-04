@@ -305,6 +305,15 @@ body {
   .onda-agua {
     animation: onda-agua 2.6s linear infinite;
   }
+
+  /*
+   * Brilho do foguinho da constância: só pulsa quando o cliente já registrou
+   * hoje (mereceu) — é o empurrão pra tocar e compartilhar naquele instante,
+   * em vez de um brilho ligado o tempo todo que vira ruído.
+   */
+  .brilho-fogo {
+    animation: brilho-fogo 1.6s ease-in-out infinite;
+  }
 }
 
 @keyframes fade-up {
@@ -351,6 +360,18 @@ body {
   }
 }
 
+@keyframes brilho-fogo {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(255, 193, 69, 0));
+  }
+  50% {
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 6px rgba(255, 193, 69, 0.75));
+  }
+}
+
 /*
  * Quem pediu menos movimento recebe o resultado final, imediato — nunca
  * uma tela vazia. Todo efeito acima é decoração sobre um estado que já
@@ -361,7 +382,8 @@ body {
   .entrada-aba,
   .anel-preenche,
   .barra-preenche,
-  .onda-agua {
+  .onda-agua,
+  .brilho-fogo {
     animation: none;
   }
   .expand {

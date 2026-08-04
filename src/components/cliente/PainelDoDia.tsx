@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Flame, Plus } from "lucide-react";
+import { Check, Flame, Plus, Share2 } from "lucide-react";
 import { definirMetaAgua, registrarAgua, registrarTreino } from "@/lib/cliente/publico";
+import { compartilharResumoDoDia, type SaldoDia } from "@/lib/cliente/compartilhar";
 
 type Cor = "agua" | "dieta" | "treino";
 
@@ -242,18 +243,51 @@ export function MacrosDoDia({
 const DIAS_ROTULO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 /**
- * Chama da constância: a fileira da semana (uma chama por dia com registro)
- * e o total da ofensiva. A partir de 7 dias seguidos a chama fica azul — o
- * selo de "constância impecável".
+ * Chama da constância: a fileira da semana (uma chama por dia com registro),
+ * o total da ofensiva e o botão de compartilhar. A partir de 7 dias seguidos
+ * a chama fica azul — o selo de "constância impecável".
+ *
+ * O foguinho grande PULSA quando o cliente já registrou hoje (`ativaHoje`) —
+ * o empurrão pra tocar em "Compartilhar" naquele instante de êxtase, em vez
+ * de um botão flutuante brilhando o tempo todo (que virava ruído).
  */
 export function ChamaDaSemana({
   semana,
   ofensiva,
+  nome,
+  saldo,
 }: {
   semana: { dias: boolean[]; hoje: number };
   ofensiva: { dias: number; ativaHoje: boolean };
+  nome: string;
+  /** Saldo do dia pra gerar o card; null quando o cliente não tem nutrição. */
+  saldo: SaldoDia | null;
 }) {
   const azul = ofensiva.dias >= 7;
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function compartilhar() {
+    setErro(null);
+    setOcupado(true);
+    try {
+      if (saldo) {
+        const r = await compartilharResumoDoDia(nome, saldo);
+        if (!r.ok) setErro(r.erro);
+        return;
+      }
+      const texto =
+        ofensiva.dias > 0
+          ? `🔥 Tô há ${ofensiva.dias} ${ofensiva.dias === 1 ? "dia" : "dias"} de constância no NoSheipe!`
+          : "Tô treinando a constância no NoSheipe 💪";
+      if (navigator.share) await navigator.share({ title: "NoSheipe", text: texto });
+      else await navigator.clipboard?.writeText(texto);
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) setErro("não deu pra compartilhar — tente de novo");
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   return (
     <section id="constancia" className="paper-card mt-8 scroll-mt-20 rounded-sm p-4">
@@ -263,7 +297,7 @@ export function ChamaDaSemana({
             azul ? "bg-sky-500/10 text-sky-400" : "text-attention"
           }`}
         >
-          <Flame size={22} strokeWidth={2} fill="currentColor" />
+          <Flame size={22} strokeWidth={2} fill="currentColor" className={ofensiva.ativaHoje ? "brilho-fogo" : ""} />
           <span className="font-display text-lg leading-none tabular-nums">{ofensiva.dias}</span>
           {azul && <span className="text-[0.6rem] font-medium tracking-wide">AZUL</span>}
         </div>
@@ -288,6 +322,24 @@ export function ChamaDaSemana({
             })}
           </div>
         </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          disabled={ocupado}
+          onClick={compartilhar}
+          className={`tatil inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+            ofensiva.ativaHoje
+              ? "bg-attention text-paper shadow-sm hover:opacity-90"
+              : "border border-rule text-ink-soft hover:border-sheipe hover:text-ink"
+          }`}
+        >
+          <Share2 size={13} strokeWidth={1.75} />
+          {ocupado ? "Gerando…" : "Compartilhar"}
+        </button>
+        {ofensiva.ativaHoje && !erro && <span className="text-xs text-ink-faint">🔥 no clima — mostra pra galera!</span>}
+        {erro && <span className="text-xs text-urgent">{erro}</span>}
       </div>
     </section>
   );
