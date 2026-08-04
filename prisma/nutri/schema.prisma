@@ -114,6 +114,12 @@ model Cliente {
   // sem sessão. Null = mostra a inicial do nome.
   fotoBase64 String?
 
+  // Ranking RBP (Run Best Player). Opt-in explícito: só entra quem quer, e
+  // aparece pelo APELIDO — nunca o nome real. Sem participar, não é listado
+  // nem contado. Dado de saúde é sensível; competição pública é escolha.
+  participaRanking Boolean @default(false)
+  apelidoRanking   String?
+
   vinculos            Vinculo[]
   planosNutricionais  PlanoNutricional[]
   treinos             TreinoPrescrito[]

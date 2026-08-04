@@ -8,6 +8,7 @@ import {
   StatusVinculo,
   ajustarMacrosSchema,
   definirMetaAguaSchema,
+  entrarRankingSchema,
   favoritoSchema,
   fotoPerfilSchema,
   inscricaoPushSchema,
@@ -450,6 +451,43 @@ export async function registrarCorrida(input: unknown): Promise<ResultadoAcaoPub
 
   revalidatePath(`/p/${parsed.data.token}/treino`);
   revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Entra no ranking RBP escolhendo um apelido público. Opt-in explícito:
+ * antes disso o cliente não é listado nem contado. O apelido é o que
+ * aparece pros outros — nunca o nome real.
+ */
+export async function entrarNoRanking(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = entrarRankingSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "apelido inválido" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.cliente.update({
+    where: { id: cliente.id },
+    data: { participaRanking: true, apelidoRanking: parsed.data.apelido },
+  });
+
+  revalidatePath(`/p/${parsed.data.token}/treino`);
+  return { sucesso: true };
+}
+
+/** Sai do ranking — para de ser listado/contado. Mantém o apelido pra voltar fácil. */
+export async function sairDoRanking(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = tokenSchema.safeParse(input);
+  if (!parsed.success) return { sucesso: false, erro: "token inválido" };
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.cliente.update({ where: { id: cliente.id }, data: { participaRanking: false } });
+
+  revalidatePath(`/p/${parsed.data.token}/treino`);
   return { sucesso: true };
 }
 
