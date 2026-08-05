@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Flame, Plus, Share2 } from "lucide-react";
 import { definirMetaAgua, registrarAgua, registrarTreino } from "@/lib/cliente/publico";
 import { compartilharResumoDoDia, type SaldoDia } from "@/lib/cliente/compartilhar";
+import { nivelDaChama } from "@/lib/cliente/ofensiva";
 
 type Cor = "agua" | "dieta" | "treino";
 
@@ -263,7 +264,7 @@ export function ChamaDaSemana({
   /** Saldo do dia pra gerar o card; null quando o cliente não tem nutrição. */
   saldo: SaldoDia | null;
 }) {
-  const azul = ofensiva.dias >= 7;
+  const nivel = nivelDaChama(ofensiva.dias);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -292,18 +293,45 @@ export function ChamaDaSemana({
   return (
     <section id="constancia" className="paper-card mt-8 scroll-mt-20 rounded-sm p-4">
       <div className="flex items-center gap-3">
-        <div
-          className={`flex flex-col items-center rounded-sm px-3 py-2 ${
-            azul ? "bg-sky-500/10 text-sky-400" : "text-attention"
-          }`}
-        >
-          <Flame size={22} strokeWidth={2} fill="currentColor" className={ofensiva.ativaHoje ? "brilho-fogo" : ""} />
-          <span className="font-display text-lg leading-none tabular-nums">{ofensiva.dias}</span>
-          {azul && <span className="text-[0.6rem] font-medium tracking-wide">AZUL</span>}
+        <div className="flex flex-col items-center gap-1">
+          {/* Foguinho da constância: o número mora DENTRO da chama, que cresce
+              e muda de cor a cada marco (âmbar → azul → verde). O tamanho vem
+              da nivelDaChama; a chama pulsa quando já registrou hoje. */}
+          <span
+            className="relative inline-flex items-center justify-center"
+            style={{ width: nivel.tamanho, height: nivel.tamanho }}
+            aria-label={`${ofensiva.dias} ${ofensiva.dias === 1 ? "dia" : "dias"} de constância — ${nivel.rotulo}`}
+          >
+            <Flame
+              size={nivel.tamanho}
+              strokeWidth={1.5}
+              fill={nivel.cor}
+              className={ofensiva.ativaHoje ? "brilho-fogo" : ""}
+              style={{ color: nivel.cor, filter: `drop-shadow(0 0 7px ${nivel.cor}66)` }}
+            />
+            <span
+              className="absolute font-display font-semibold leading-none tabular-nums"
+              style={{
+                top: "58%",
+                left: 0,
+                right: 0,
+                transform: "translateY(-50%)",
+                textAlign: "center",
+                fontSize: Math.round(nivel.tamanho * 0.4),
+                color: "#0b1200",
+                textShadow: "0 1px 1px rgba(255,255,255,0.35)",
+              }}
+            >
+              {ofensiva.dias}
+            </span>
+          </span>
+          <span className="text-[0.6rem] font-medium tracking-wide" style={{ color: nivel.cor }}>
+            {nivel.rotulo}
+          </span>
         </div>
 
         <div className="flex-1">
-          <p className="eyebrow mb-2">{azul ? "Constância impecável" : "Sua semana"}</p>
+          <p className="eyebrow mb-2">Sua semana</p>
           <div className="flex justify-between">
             {DIAS_ROTULO.map((rotulo, i) => {
               const aceso = semana.dias[i];
@@ -313,8 +341,9 @@ export function ChamaDaSemana({
                   <Flame
                     size={18}
                     strokeWidth={aceso ? 2 : 1.5}
-                    fill={aceso ? "currentColor" : "none"}
-                    className={aceso ? (azul ? "text-sky-400" : "text-attention") : "text-ink-faint"}
+                    fill={aceso ? nivel.cor : "none"}
+                    style={aceso ? { color: nivel.cor } : undefined}
+                    className={aceso ? "" : "text-ink-faint"}
                   />
                   <span className={`text-[0.6rem] ${hoje ? "font-medium text-ink" : "text-ink-faint"}`}>{rotulo}</span>
                 </div>
@@ -323,6 +352,12 @@ export function ChamaDaSemana({
           </div>
         </div>
       </div>
+
+      {nivel.proximoEm !== null && ofensiva.dias > 0 && (
+        <p className="mt-2 text-xs text-ink-faint">
+          Faltam {nivel.proximoEm} {nivel.proximoEm === 1 ? "dia" : "dias"} pro próximo nível da chama.
+        </p>
+      )}
 
       <div className="mt-3 flex items-center justify-between gap-2">
         <button
