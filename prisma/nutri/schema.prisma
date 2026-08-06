@@ -121,6 +121,9 @@ model Cliente {
   participaRanking Boolean @default(false)
   apelidoRanking   String?
 
+  // Meta de km de corrida no mês, escolhida pelo cliente. Null = sem meta.
+  metaCorridaKmMes Int?
+
   // @usuário escolhido pelo cliente — o identificador público dele no app,
   // à parte do nome. Opcional; único quando definido.
   usuario String? @unique

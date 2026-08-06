@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Crown, Trophy, X } from "lucide-react";
 import {
+  definirMetaCorrida,
   entrarNoRanking,
   registrarCorrida,
   registrarTreino,
@@ -163,8 +164,25 @@ function BlocoCorrida({ token, corridas }: { token: string; corridas: CorridasDa
   const [recorde, setRecorde] = useState<string | null>(null);
   const [pendente, iniciarTransicao] = useTransition();
 
-  const { recordes, corridas: lista } = corridas;
+  const { recordes, corridas: lista, porDistancia, conquistas, kmNoMes, metaKmMes } = corridas;
   const km = (m: number) => (m / 1000).toFixed(1).replace(/\.0$/, "");
+
+  const [editandoMeta, setEditandoMeta] = useState(false);
+  const [rascunhoMeta, setRascunhoMeta] = useState(metaKmMes ? String(metaKmMes) : "");
+  const progressoMes = metaKmMes && metaKmMes > 0 ? Math.min(100, Math.round((kmNoMes / metaKmMes) * 100)) : 0;
+
+  function salvarMeta() {
+    setErro(null);
+    iniciarTransicao(async () => {
+      const r = await definirMetaCorrida({ token, metaKm: rascunhoMeta.trim() ? Number(rascunhoMeta) : 0 });
+      if (!r.sucesso) {
+        setErro(r.erro);
+        return;
+      }
+      setEditandoMeta(false);
+      router.refresh();
+    });
+  }
 
   function registrar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -204,11 +222,87 @@ function BlocoCorrida({ token, corridas }: { token: string; corridas: CorridasDa
         <Trophy size={13} strokeWidth={1.75} className="text-treino" /> Corrida
       </h2>
 
+      {/* Meta do mês: quanto já correu vs a meta, com barra de progresso. */}
+      <div className="paper-card mb-3 rounded-sm p-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-sm">
+            <span className="font-data text-treino">{kmNoMes} km</span>
+            <span className="text-ink-faint"> em {MES_ATUAL}</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setRascunhoMeta(metaKmMes ? String(metaKmMes) : "");
+              setEditandoMeta((v) => !v);
+            }}
+            className="tatil text-xs text-ink-faint underline underline-offset-2 hover:text-treino"
+          >
+            {metaKmMes ? "meta " + metaKmMes + " km" : "definir meta"}
+          </button>
+        </div>
+        {metaKmMes && metaKmMes > 0 && (
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-rule">
+            <div className="barra-preenche h-full bg-treino" style={{ width: `${progressoMes}%` }} />
+          </div>
+        )}
+        {editandoMeta && (
+          <div className="mt-2 flex items-end gap-2">
+            <input
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={rascunhoMeta}
+              onChange={(e) => setRascunhoMeta(e.target.value)}
+              placeholder="km no mês (0 = sem meta)"
+              className="w-40 rounded-sm border border-rule bg-paper px-2 py-1 text-sm outline-none focus:border-treino"
+            />
+            <button
+              type="button"
+              disabled={pendente}
+              onClick={salvarMeta}
+              className="tatil rounded-sm border border-rule px-3 py-1.5 text-xs text-ink-soft hover:border-treino hover:text-ink disabled:opacity-50"
+            >
+              Salvar
+            </button>
+          </div>
+        )}
+      </div>
+
       {recordes.quantidade > 0 && (
         <div className="mb-3 grid grid-cols-3 gap-2">
           <Recorde rotulo="Melhor pace" valor={recordes.melhorPaceSegKm ? formatarPace(recordes.melhorPaceSegKm) : "—"} />
           <Recorde rotulo="Maior distância" valor={`${km(recordes.maiorDistanciaMetros)} km`} />
           <Recorde rotulo="Total" valor={`${km(recordes.totalMetros)} km`} />
+        </div>
+      )}
+
+      {porDistancia.length > 0 && (
+        <div className="mb-3">
+          <p className="eyebrow mb-1.5 text-[0.6rem]">Melhor pace por distância</p>
+          <div className="grid grid-cols-3 gap-2">
+            {porDistancia.map((d) => (
+              <Recorde key={d.metros} rotulo={d.rotulo} valor={formatarPace(d.melhorPaceSegKm)} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {conquistas.some((c) => c.alcancada) && (
+        <div className="mb-3">
+          <p className="eyebrow mb-1.5 text-[0.6rem]">Conquistas</p>
+          <div className="flex flex-wrap gap-1.5">
+            {conquistas.map((c) => (
+              <span
+                key={c.id}
+                className={`rounded-full border px-2.5 py-1 text-xs ${
+                  c.alcancada ? "border-treino text-treino" : "border-rule text-ink-faint opacity-60"
+                }`}
+              >
+                {c.alcancada ? "🏅 " : "🔒 "}
+                {c.rotulo}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 

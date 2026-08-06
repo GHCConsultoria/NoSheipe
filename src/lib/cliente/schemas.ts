@@ -236,6 +236,11 @@ export const registrarCorridaSchema = tokenSchema.extend({
   duracaoMin: z.coerce.number().positive("tempo deve ser positivo").max(1440, "tempo fora do plausível"),
 });
 
+/** Meta de km de corrida no mês; 0 limpa a meta. */
+export const definirMetaCorridaSchema = tokenSchema.extend({
+  metaKm: z.coerce.number().int().min(0, "meta inválida").max(2000, "meta fora do plausível"),
+});
+
 /**
  * @usuário público — minúsculo, sem espaço, começando com letra. É o
  * identificador que o cliente escolhe pra si (à parte do nome).

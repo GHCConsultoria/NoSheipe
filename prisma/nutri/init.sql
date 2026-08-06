@@ -409,6 +409,10 @@ ALTER TABLE "clientes" ADD COLUMN "apelidoRanking" TEXT;
 -- @usuário público do cliente. Idempotente como os ALTERs acima.
 ALTER TABLE "clientes" ADD COLUMN "usuario" TEXT;
 
+-- AlterTable
+-- Meta de km de corrida no mês (null = sem meta). Idempotente.
+ALTER TABLE "clientes" ADD COLUMN "metaCorridaKmMes" INTEGER;
+
 -- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "clientes_usuario_key" ON "clientes"("usuario");
 
