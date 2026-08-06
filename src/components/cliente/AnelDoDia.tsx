@@ -24,7 +24,7 @@ const RAIO_TREINO = 86;
 const RAIO_DIETA = 64;
 const RAIO_AGUA = 46;
 /** Inclinação máxima da superfície da água ao girar o aparelho, em graus. */
-const TILT_MAX = 13;
+const TILT_MAX = 24;
 
 function fracao(pct: number): number {
   return Math.min(Math.max(pct, 0), 100) / 100;
@@ -92,7 +92,7 @@ export function AnelDoDia({ treino, dieta, total }: Props) {
 
     const aoInclinar = (e: DeviceOrientationEvent) => {
       const gamma = e.gamma ?? 0; // giro esquerda/direita do aparelho
-      alvo = Math.max(-TILT_MAX, Math.min(TILT_MAX, -gamma * 0.55));
+      alvo = Math.max(-TILT_MAX, Math.min(TILT_MAX, -gamma));
     };
 
     const loop = () => {
@@ -163,11 +163,19 @@ export function AnelDoDia({ treino, dieta, total }: Props) {
               >
                 {/* Corpo do líquido, do topo do disco bem pra baixo. */}
                 <rect x={CENTRO - 70} y={topoAgua + 6} width={140} height={alturaAgua + 70} fill="var(--color-agua)" opacity={0.9} />
-                {/* Crista: uma onda larga que desliza de lado (loop de 40px). */}
+                {/* Crista: onda larga PARADA — não desliza sozinha; quem move a
+                    superfície é o tilt do giroscópio (o grupo pai gira). */}
                 <path
-                  className="onda-agua"
                   fill="var(--color-agua)"
                   d={`M${CENTRO - 110},${topoAgua + 6} q10,-6 20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 V${topoAgua + alturaAgua + 70} H${CENTRO - 110} Z`}
+                />
+                {/* Reflexo fino na linha da água — dá leitura de superfície. */}
+                <path
+                  fill="none"
+                  stroke="#dffbff"
+                  strokeWidth={1.5}
+                  strokeOpacity={0.45}
+                  d={`M${CENTRO - 110},${topoAgua + 6} q10,-6 20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0`}
                 />
               </g>
             </g>
