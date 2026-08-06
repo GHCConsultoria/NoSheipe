@@ -1,6 +1,7 @@
 import type { Cliente } from "../../../prisma/nutri/generated";
 import { prismaNutri } from "@/lib/nutri/prisma";
 import { StatusVinculo, TipoVinculo } from "@/lib/cliente/schemas";
+import type { ExercicioPrescritoDado } from "@/lib/cliente/consultas";
 import {
   calcularAderenciaSemana,
   calcularSaldoDoDia,
@@ -127,7 +128,7 @@ export interface FichaDoCliente {
   acompanhaNutricao: boolean;
   acompanhaTreino: boolean;
   metas: { metaKcal: number; metaProteina: number; metaCarbo: number; metaGordura: number } | null;
-  treino: { nome: string; descricao: string; diasPorSemana: number } | null;
+  treino: { id: string; nome: string; descricao: string; diasPorSemana: number; exercicios: ExercicioPrescritoDado[] } | null;
   anamneseNutricional: Awaited<ReturnType<typeof prismaNutri.anamneseNutricional.findUnique>>;
   anamneseTreino: Awaited<ReturnType<typeof prismaNutri.anamneseTreino.findUnique>>;
   anotacoes: { id: string; texto: string; criadoEm: Date }[];
@@ -181,7 +182,11 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
       ? prismaNutri.planoNutricional.findFirst({ where: { clienteId, ativo: true }, orderBy: { criadoEm: "desc" } })
       : null,
     acompanhaTreino
-      ? prismaNutri.treinoPrescrito.findFirst({ where: { clienteId, ativo: true }, orderBy: { criadoEm: "desc" } })
+      ? prismaNutri.treinoPrescrito.findFirst({
+          where: { clienteId, ativo: true },
+          orderBy: { criadoEm: "desc" },
+          include: { exercicios: { orderBy: { ordem: "asc" } } },
+        })
       : null,
     acompanhaNutricao ? prismaNutri.anamneseNutricional.findUnique({ where: { clienteId } }) : null,
     acompanhaTreino ? prismaNutri.anamneseTreino.findUnique({ where: { clienteId } }) : null,
@@ -233,7 +238,23 @@ export async function buscarFichaDoCliente(clienteId: string, profissionalId: st
           metaGordura: plano.metaGordura,
         }
       : null,
-    treino: treino ? { nome: treino.nome, descricao: treino.descricao, diasPorSemana: treino.diasPorSemana } : null,
+    treino: treino
+      ? {
+          id: treino.id,
+          nome: treino.nome,
+          descricao: treino.descricao,
+          diasPorSemana: treino.diasPorSemana,
+          exercicios: treino.exercicios.map((e) => ({
+            id: e.id,
+            nome: e.nome,
+            ordem: e.ordem,
+            seriesAlvo: e.seriesAlvo,
+            repsAlvo: e.repsAlvo,
+            cargaAlvoKg: e.cargaAlvoKg,
+            descansoSeg: e.descansoSeg,
+          })),
+        }
+      : null,
     anamneseNutricional,
     anamneseTreino,
     anotacoes: anotacoes.map((a) => ({ id: a.id, texto: a.texto, criadoEm: a.criadoEm })),

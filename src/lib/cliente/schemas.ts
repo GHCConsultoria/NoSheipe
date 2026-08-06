@@ -202,6 +202,34 @@ export const registrarSchema = tokenSchema.extend({
   origem: z.nativeEnum(OrigemRegistro).default(OrigemRegistro.TEXTO),
 });
 
+/** Uma série que o cliente registrou: exercício + carga (kg) + reps. */
+export const serieRegistradaSchema = z.object({
+  exercicio: z.string().trim().min(1, "informe o exercício").max(60),
+  cargaKg: z.coerce.number().min(0).max(1000).nullable().default(null),
+  reps: z.coerce.number().int().min(0).max(1000).nullable().default(null),
+});
+
+/** Cliente registra um treino estruturado: uma sessão com várias séries. */
+export const registrarTreinoEstruturadoSchema = tokenSchema.extend({
+  clientLogId: z.string().uuid("clientLogId deve ser um UUID"),
+  nomeTreino: z.string().trim().max(80).default("Treino"),
+  series: z.array(serieRegistradaSchema).min(1, "registre ao menos uma série").max(200),
+});
+
+/** Um exercício prescrito pelo personal: nome, séries/reps-alvo, carga-alvo. */
+export const exercicioPrescritoSchema = z.object({
+  nome: z.string().trim().min(1, "informe o nome do exercício").max(60),
+  seriesAlvo: z.coerce.number().int().min(1, "mínimo 1 série").max(20).default(3),
+  repsAlvo: z.string().trim().min(1).max(20).default("8-12"),
+  cargaAlvoKg: z.coerce.number().min(0).max(1000).nullable().default(null),
+  descansoSeg: z.coerce.number().int().min(0).max(900).nullable().default(null),
+});
+
+/** Personal define a lista de exercícios do treino ativo do cliente (substitui). */
+export const salvarExerciciosSchema = clienteIdSchema.extend({
+  exercicios: z.array(exercicioPrescritoSchema).max(40, "no máximo 40 exercícios"),
+});
+
 /** Uma corrida: distância em km e tempo em minutos (viram metros/segundos na ação). */
 export const registrarCorridaSchema = tokenSchema.extend({
   distanciaKm: z.coerce.number().positive("distância deve ser positiva").max(500, "distância fora do plausível"),

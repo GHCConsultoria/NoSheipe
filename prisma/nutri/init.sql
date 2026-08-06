@@ -532,3 +532,42 @@ CREATE TABLE IF NOT EXISTS "ofertas" (
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "ofertas_profissionalId_idx" ON "ofertas"("profissionalId");
+
+
+-- ============================================================
+-- Treino estruturado: exercícios prescritos (personal) e séries
+-- registradas (cliente).
+-- ============================================================
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "exercicios_prescritos" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "treinoId" TEXT NOT NULL,
+    "nome" TEXT NOT NULL,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "seriesAlvo" INTEGER NOT NULL DEFAULT 3,
+    "repsAlvo" TEXT NOT NULL DEFAULT '8-12',
+    "cargaAlvoKg" REAL,
+    "descansoSeg" INTEGER,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "exercicios_prescritos_treinoId_fkey" FOREIGN KEY ("treinoId") REFERENCES "treinos_prescritos" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "exercicios_prescritos_treinoId_idx" ON "exercicios_prescritos"("treinoId");
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "series_registradas" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "sessaoId" TEXT NOT NULL,
+    "exercicio" TEXT NOT NULL,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "reps" INTEGER,
+    "cargaKg" REAL,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "series_registradas_sessaoId_fkey" FOREIGN KEY ("sessaoId") REFERENCES "sessoes_treino" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "series_registradas_sessaoId_idx" ON "series_registradas"("sessaoId");
+CREATE INDEX IF NOT EXISTS "series_registradas_exercicio_idx" ON "series_registradas"("exercicio");

@@ -216,7 +216,53 @@ model TreinoPrescrito {
 
   criadoEm DateTime @default(now())
 
+  exercicios ExercicioPrescrito[]
+
   @@map("treinos_prescritos")
+}
+
+// Exercício de um treino prescrito — o lado "personal prescreve" do treino
+// estruturado: nome, séries e reps-alvo e carga-alvo opcional. O cliente
+// segue estes e registra a carga real em SerieRegistrada.
+model ExercicioPrescrito {
+  id String @id @default(cuid())
+
+  treino   TreinoPrescrito @relation(fields: [treinoId], references: [id])
+  treinoId String
+
+  nome        String
+  ordem       Int    @default(0)
+  seriesAlvo  Int    @default(3)
+  repsAlvo    String @default("8-12")
+  cargaAlvoKg Float?
+  descansoSeg Int?
+
+  criadoEm DateTime @default(now())
+
+  @@index([treinoId])
+  @@map("exercicios_prescritos")
+}
+
+// Série efetivamente registrada pelo cliente numa sessão — o lado "cliente
+// executa". `exercicio` é o nome desnormalizado (o histórico sobrevive a
+// mudança/remoção da prescrição, e o cliente pode registrar um exercício
+// avulso que não estava prescrito). PR de carga sai daqui.
+model SerieRegistrada {
+  id String @id @default(cuid())
+
+  sessao   SessaoTreino @relation(fields: [sessaoId], references: [id])
+  sessaoId String
+
+  exercicio String
+  ordem     Int    @default(0)
+  reps      Int?
+  cargaKg   Float?
+
+  criadoEm DateTime @default(now())
+
+  @@index([sessaoId])
+  @@index([exercicio])
+  @@map("series_registradas")
 }
 
 model Refeicao {
@@ -279,6 +325,8 @@ model SessaoTreino {
 
   // Simétrico a Refeicao — o cliente pode ter marcado um treino que não fez.
   removidoEm DateTime?
+
+  series SerieRegistrada[]
 
   @@map("sessoes_treino")
 }
