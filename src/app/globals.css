@@ -16,12 +16,12 @@
 }
 
 :root {
-  --color-paper: #0a0b0d;
-  --color-paper-raised: #131519;
+  --color-paper: #060708;
+  --color-paper-raised: #0f1217;
   --color-ink: #e6e8eb;
   --color-ink-soft: #8b929b;
   --color-ink-faint: #52585f;
-  --color-rule: #22262c;
+  --color-rule: #23282f;
 
   --color-urgent: #ff6b7a;
   --color-urgent-bg: #2a1319;
@@ -128,12 +128,12 @@
  * prefers-color-scheme como sempre.
  */
 :root[data-theme="dark"] {
-  --color-paper: #0a0b0d;
-  --color-paper-raised: #131519;
+  --color-paper: #060708;
+  --color-paper-raised: #0f1217;
   --color-ink: #e6e8eb;
   --color-ink-soft: #8b929b;
   --color-ink-faint: #52585f;
-  --color-rule: #22262c;
+  --color-rule: #23282f;
   --color-urgent: #ff6b7a;
   --color-urgent-bg: #2a1319;
   --color-urgent-line: #ff6b7a;
@@ -205,9 +205,32 @@ body {
 
 body {
   color: var(--color-ink);
-  background: var(--color-paper);
+  /* Glow ambiente quente no topo (verde da marca + gold), por cima do preto
+     profundo — o toque "premium" que tira a cara de card chapado. Só no
+     escuro; no claro volta ao fundo liso. Fixo, não rola com o conteúdo. */
+  background:
+    radial-gradient(55vw 38vh at 82% -8%, rgba(34, 197, 94, 0.05), transparent 60%),
+    radial-gradient(48vw 34vh at 10% 2%, rgba(255, 193, 69, 0.04), transparent 62%),
+    var(--color-paper);
+  background-attachment: fixed;
   font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   min-height: 100vh;
+}
+
+@media (prefers-color-scheme: light) {
+  body {
+    background: var(--color-paper);
+  }
+}
+:root[data-theme="light"] body {
+  background: var(--color-paper);
+}
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(55vw 38vh at 82% -8%, rgba(34, 197, 94, 0.05), transparent 60%),
+    radial-gradient(48vw 34vh at 10% 2%, rgba(255, 193, 69, 0.04), transparent 62%),
+    var(--color-paper);
+  background-attachment: fixed;
 }
 
 ::selection {
