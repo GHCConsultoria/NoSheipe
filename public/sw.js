@@ -1,5 +1,5 @@
 /*
- * Service worker do NoSheipe — só o necessário pra Web Push. Sem cache
+ * Service worker do SHEIPE — só o necessário pra Web Push. Sem cache
  * offline de propósito: o app é dinâmico (o progresso do dia muda a cada
  * registro) e um cache agressivo mostraria número velho. Registrar o SW é o
  * que permite receber push com o PWA fechado (e, no iOS 16.4+, receber push
@@ -17,7 +17,7 @@ self.addEventListener("push", (event) => {
     dados = {};
   }
 
-  const titulo = dados.titulo || "NoSheipe";
+  const titulo = dados.titulo || "SHEIPE";
   const corpo = dados.corpo || "";
   const url = dados.url || "/";
 

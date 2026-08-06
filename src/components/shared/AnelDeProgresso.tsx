@@ -30,7 +30,7 @@ const CORES: Record<Arco["cor"], { traco: string; texto: string }> = {
 /**
  * O progresso do dia como anéis concêntricos.
  *
- * É a mesma forma da marca — a logo do NoSheipe já é um anel de progresso.
+ * É a mesma forma da marca — a logo do SHEIPE já é um anel de progresso.
  * Em escala, ela deixa de ser enfeite no topo e passa a ser o dado: o
  * cliente abre o app e vê a própria meta desenhada no símbolo do produto.
  *

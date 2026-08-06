@@ -21,7 +21,7 @@ const plexMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NoSheipe",
+  title: "SHEIPE",
   description: "Painel do nutricionista e registro de refeições por áudio/texto com IA.",
 };
 

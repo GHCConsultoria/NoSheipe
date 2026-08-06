@@ -15,9 +15,9 @@ export const viewport: Viewport = { themeColor: "#16a34a" };
  */
 export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
   return {
-    title: "NoSheipe",
+    title: "SHEIPE",
     manifest: `/p/${params.token}/manifest.json`,
-    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "NoSheipe" },
+    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "SHEIPE" },
     icons: { icon: "/icons/nosheipe-192.png", apple: "/icons/nosheipe-180.png" },
   };
 }

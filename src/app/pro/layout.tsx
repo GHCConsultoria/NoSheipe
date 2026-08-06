@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ScriptSemFlashDeTema } from "@/components/nutri/ScriptSemFlashDeTema";
 
 export const metadata: Metadata = {
-  title: "NoSheipe",
+  title: "SHEIPE",
   description: "Painel do profissional — nutrição e treino num só lugar.",
   icons: {
     icon: "/icons/nosheipe-192.png",

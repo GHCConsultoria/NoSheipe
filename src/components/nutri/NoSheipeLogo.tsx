@@ -21,7 +21,7 @@ export function NoSheipeLogo({ size = 28, comTexto = true }: Props) {
           cy="50"
           r={RAIO}
           fill="none"
-          stroke="#22c55e"
+          stroke="#00FF66"
           strokeWidth="11"
           strokeLinecap="round"
           strokeDasharray={`${CIRCUNFERENCIA * PROGRESSO} ${CIRCUNFERENCIA}`}
@@ -29,9 +29,7 @@ export function NoSheipeLogo({ size = 28, comTexto = true }: Props) {
         />
       </svg>
       {comTexto && (
-        <span className="font-display text-lg tracking-tight">
-          No<span style={{ color: "var(--color-sheipe)" }}>Sheipe</span>
-        </span>
+        <span className="font-display text-lg font-semibold tracking-[0.14em] text-ink">SHEIPE</span>
       )}
     </div>
   );

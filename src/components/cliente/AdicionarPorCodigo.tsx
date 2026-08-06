@@ -32,7 +32,7 @@ export function AdicionarPorCodigo({ ehNutricionista, ehPersonal }: Props) {
         onClick={() => setAberto(true)}
         className="text-sm text-ink-soft transition-colors hover:text-sheipe"
       >
-        já usa o NoSheipe? adicionar por código
+        já usa o SHEIPE? adicionar por código
       </button>
     );
   }

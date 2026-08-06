@@ -86,7 +86,7 @@ function gerarImagem(nome: string, saldo: SaldoDia): Promise<Blob | null> {
 
   ctx.fillStyle = corInk;
   ctx.font = "600 32px system-ui, sans-serif";
-  ctx.fillText("NoSheipe", 136, 106);
+  ctx.fillText("SHEIPE", 136, 106);
 
   ctx.fillStyle = corInkSoft;
   ctx.font = "500 28px system-ui, sans-serif";
@@ -145,7 +145,7 @@ function gerarImagem(nome: string, saldo: SaldoDia): Promise<Blob | null> {
 
   ctx.fillStyle = corInkSoft;
   ctx.font = "500 22px system-ui, sans-serif";
-  ctx.fillText("Acompanhamento nutricional com NoSheipe", 80, altura - 60);
+  ctx.fillText("Acompanhamento nutricional com SHEIPE", 80, altura - 60);
 
   return new Promise((resolver) => canvas.toBlob((blob) => resolver(blob), "image/png"));
 }
@@ -158,7 +158,7 @@ export async function compartilharResumoDoDia(nome: string, saldo: SaldoDia): Pr
     const arquivo = new File([blob], "nosheipe-resumo-do-dia.png", { type: "image/png" });
 
     if (navigator.canShare?.({ files: [arquivo] })) {
-      await navigator.share({ files: [arquivo], title: "Meu resumo de hoje — NoSheipe" });
+      await navigator.share({ files: [arquivo], title: "Meu resumo de hoje — SHEIPE" });
       return { ok: true };
     }
 

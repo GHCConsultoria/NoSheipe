@@ -8,12 +8,12 @@ import { buscarClientePorToken } from "@/lib/cliente/consultas";
  */
 export async function GET(_request: Request, { params }: { params: { token: string } }) {
   const cliente = await buscarClientePorToken(params.token);
-  const nome = cliente ? cliente.nome : "NoSheipe";
+  const nome = cliente ? cliente.nome : "SHEIPE";
 
   return NextResponse.json(
     {
-      name: `NoSheipe — ${nome}`,
-      short_name: "NoSheipe",
+      name: `SHEIPE — ${nome}`,
+      short_name: "SHEIPE",
       description: "Registre o que você comeu e acompanhe sua aderência às metas.",
       start_url: `/p/${params.token}`,
       scope: `/p/${params.token}`,

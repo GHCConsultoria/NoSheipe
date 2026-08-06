@@ -3,7 +3,7 @@ import { PrismaLibSQL } from "@prisma/adapter-libsql";
 import { createClient } from "@libsql/client";
 
 /**
- * Client Prisma do módulo NoSheipe — banco próprio (Turso/libSQL), separado
+ * Client Prisma do módulo SHEIPE — banco próprio (Turso/libSQL), separado
  * do Postgres/Supabase do sistema jurídico (ver src/lib/prisma.ts). URL
  * placeholder quando TURSO_DATABASE_URL não está configurada: constrói o
  * client sem lançar (só falha na primeira query de verdade), igual ao

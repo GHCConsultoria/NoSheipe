@@ -279,9 +279,9 @@ export function ChamaDaSemana({
       }
       const texto =
         ofensiva.dias > 0
-          ? `🔥 Tô há ${ofensiva.dias} ${ofensiva.dias === 1 ? "dia" : "dias"} de constância no NoSheipe!`
-          : "Tô treinando a constância no NoSheipe 💪";
-      if (navigator.share) await navigator.share({ title: "NoSheipe", text: texto });
+          ? `🔥 Tô há ${ofensiva.dias} ${ofensiva.dias === 1 ? "dia" : "dias"} de constância no SHEIPE!`
+          : "Tô treinando a constância no SHEIPE 💪";
+      if (navigator.share) await navigator.share({ title: "SHEIPE", text: texto });
       else await navigator.clipboard?.writeText(texto);
     } catch (e) {
       if (!(e instanceof DOMException && e.name === "AbortError")) setErro("não deu pra compartilhar — tente de novo");
