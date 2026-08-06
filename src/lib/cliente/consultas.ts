@@ -10,7 +10,15 @@ import {
 import { calcularAderenciaTreino, type AderenciaTreino } from "@/lib/personal/aderencia";
 import { calcularHidratacao, type Hidratacao } from "@/lib/cliente/hidratacao";
 import { calcularOfensiva, type Ofensiva } from "@/lib/cliente/ofensiva";
-import { calcularRecordes, paceSegundosPorKm, type Recordes } from "@/lib/cliente/corrida";
+import {
+  calcularRecordes,
+  conquistasDeCorrida,
+  paceSegundosPorKm,
+  recordesPorDistancia,
+  type Conquista,
+  type RecordePorDistancia,
+  type Recordes,
+} from "@/lib/cliente/corrida";
 import { ordenarRanking, type EntradaRanking } from "@/lib/cliente/ranking";
 import { recordesPorExercicio, type RecordeExercicio } from "@/lib/cliente/forca";
 
@@ -483,22 +491,45 @@ export interface CorridaDoCliente {
 export interface CorridasDados {
   recordes: Recordes;
   corridas: CorridaDoCliente[];
+  /** Melhores paces por marco de distância (5/10/21 km). */
+  porDistancia: RecordePorDistancia[];
+  /** Conquistas de distância e volume acumulado. */
+  conquistas: Conquista[];
+  /** Km corridos no mês-calendário atual (São Paulo). */
+  kmNoMes: number;
+  /** Meta de km do mês escolhida pelo cliente; null = sem meta. */
+  metaKmMes: number | null;
 }
 
+const CHAVE_MES_SP = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+});
+
 /**
- * Corridas do cliente + recordes pessoais. Os recordes olham TODO o
- * histórico (take alto); a lista mostra só as mais recentes. Pace derivado
- * na hora a partir de metros/segundos.
+ * Corridas do cliente + recordes. Os recordes e conquistas olham TODO o
+ * histórico; a lista mostra só as mais recentes. Traz também os melhores
+ * paces por distância, o volume do mês e a meta mensal. Pace derivado na
+ * hora a partir de metros/segundos.
  */
 export async function buscarCorridasDoCliente(clienteId: string): Promise<CorridasDados> {
-  const corridas = await prismaNutri.corrida.findMany({
-    where: { clienteId },
-    orderBy: { realizadoEm: "desc" },
-    take: 200,
-  });
+  const [corridas, cliente] = await Promise.all([
+    prismaNutri.corrida.findMany({ where: { clienteId }, orderBy: { realizadoEm: "desc" }, take: 200 }),
+    prismaNutri.cliente.findUnique({ where: { id: clienteId }, select: { metaCorridaKmMes: true } }),
+  ]);
+
+  const mesAtual = CHAVE_MES_SP.format(new Date());
+  const metrosNoMes = corridas
+    .filter((c) => CHAVE_MES_SP.format(c.realizadoEm) === mesAtual)
+    .reduce((s, c) => s + c.distanciaMetros, 0);
 
   return {
     recordes: calcularRecordes(corridas),
+    porDistancia: recordesPorDistancia(corridas),
+    conquistas: conquistasDeCorrida(corridas),
+    kmNoMes: Math.round((metrosNoMes / 1000) * 10) / 10,
+    metaKmMes: cliente?.metaCorridaKmMes ?? null,
     corridas: corridas.slice(0, 12).map((c) => ({
       id: c.id,
       distanciaMetros: c.distanciaMetros,

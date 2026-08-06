@@ -9,6 +9,7 @@ import {
   StatusVinculo,
   ajustarMacrosSchema,
   definirMetaAguaSchema,
+  definirMetaCorridaSchema,
   definirUsuarioSchema,
   entrarRankingSchema,
   favoritoSchema,
@@ -525,6 +526,25 @@ export async function registrarCorrida(input: unknown): Promise<ResultadoAcaoPub
 
   revalidatePath(`/p/${parsed.data.token}/treino`);
   revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/** Define (ou limpa, com 0) a meta de km de corrida do mês. */
+export async function definirMetaCorrida(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = definirMetaCorridaSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "meta inválida" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  await prismaNutri.cliente.update({
+    where: { id: cliente.id },
+    data: { metaCorridaKmMes: parsed.data.metaKm > 0 ? parsed.data.metaKm : null },
+  });
+
+  revalidatePath(`/p/${parsed.data.token}/treino`);
   return { sucesso: true };
 }
 
