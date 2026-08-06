@@ -16,12 +16,12 @@
 }
 
 :root {
-  --color-paper: #060708;
-  --color-paper-raised: #0f1217;
+  --color-paper: #0D0E12;
+  --color-paper-raised: #16181f;
   --color-ink: #e6e8eb;
   --color-ink-soft: #8b929b;
   --color-ink-faint: #52585f;
-  --color-rule: #23282f;
+  --color-rule: #262a33;
 
   --color-urgent: #ff6b7a;
   --color-urgent-bg: #2a1319;
@@ -35,8 +35,8 @@
   --color-calm-bg: #0f241c;
   --color-calm-line: #3ddc97;
 
-  --color-sheipe: #22c55e;
-  --color-sheipe-deep: #4ade80;
+  --color-sheipe: #00FF66;
+  --color-sheipe-deep: #4dffa0;
   --color-on-sheipe: #04150a;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
@@ -50,21 +50,21 @@
      - água   = ciano (era a cor do treino antes desta virada)
      - dieta  = laranja gold
      Cada um com seu "on-" (texto por cima) com contraste nos dois temas. */
-  --color-treino: #84cc16;
-  --color-treino-deep: #a3e635;
+  --color-treino: #00FF66;
+  --color-treino-deep: #4dffa0;
   --color-on-treino: #0f1a00;
-  --color-agua: #22d3ee;
-  --color-agua-deep: #67e8f9;
+  --color-agua: #00D2FF;
+  --color-agua-deep: #5ee3ff;
   --color-on-agua: #04141a;
-  --color-dieta: #f59e0b;
-  --color-dieta-deep: #fbbf24;
+  --color-dieta: #FF9500;
+  --color-dieta-deep: #ffb443;
   --color-on-dieta: #1a1200;
 
   /* Fixas — não trocam com o tema. Painel de assinatura (login) fica sempre
      no mesmo tom, mesmo se o resto virar claro. */
   --signature-ink: #000000;
   --signature-paper: #e6e8eb;
-  --signature-sheipe: #22c55e;
+  --signature-sheipe: #00FF66;
 
   /*
    * Movimento. Uma curva só para tudo que entra ou preenche: a mesma
@@ -128,12 +128,12 @@
  * prefers-color-scheme como sempre.
  */
 :root[data-theme="dark"] {
-  --color-paper: #060708;
-  --color-paper-raised: #0f1217;
+  --color-paper: #0D0E12;
+  --color-paper-raised: #16181f;
   --color-ink: #e6e8eb;
   --color-ink-soft: #8b929b;
   --color-ink-faint: #52585f;
-  --color-rule: #23282f;
+  --color-rule: #262a33;
   --color-urgent: #ff6b7a;
   --color-urgent-bg: #2a1319;
   --color-urgent-line: #ff6b7a;
@@ -143,17 +143,17 @@
   --color-calm: #3ddc97;
   --color-calm-bg: #0f241c;
   --color-calm-line: #3ddc97;
-  --color-sheipe: #22c55e;
-  --color-sheipe-deep: #4ade80;
+  --color-sheipe: #00FF66;
+  --color-sheipe-deep: #4dffa0;
   --color-on-sheipe: #04150a;
-  --color-treino: #84cc16;
-  --color-treino-deep: #a3e635;
+  --color-treino: #00FF66;
+  --color-treino-deep: #4dffa0;
   --color-on-treino: #0f1a00;
-  --color-agua: #22d3ee;
-  --color-agua-deep: #67e8f9;
+  --color-agua: #00D2FF;
+  --color-agua-deep: #5ee3ff;
   --color-on-agua: #04141a;
-  --color-dieta: #f59e0b;
-  --color-dieta-deep: #fbbf24;
+  --color-dieta: #FF9500;
+  --color-dieta-deep: #ffb443;
   --color-on-dieta: #1a1200;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
@@ -209,8 +209,8 @@ body {
      profundo — o toque "premium" que tira a cara de card chapado. Só no
      escuro; no claro volta ao fundo liso. Fixo, não rola com o conteúdo. */
   background:
-    radial-gradient(55vw 38vh at 82% -8%, rgba(34, 197, 94, 0.05), transparent 60%),
-    radial-gradient(48vw 34vh at 10% 2%, rgba(255, 193, 69, 0.04), transparent 62%),
+    radial-gradient(55vw 38vh at 82% -8%, rgba(0, 255, 102, 0.05), transparent 60%),
+    radial-gradient(48vw 34vh at 10% 2%, rgba(255, 149, 0, 0.04), transparent 62%),
     var(--color-paper);
   background-attachment: fixed;
   font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
@@ -227,8 +227,8 @@ body {
 }
 :root[data-theme="dark"] body {
   background:
-    radial-gradient(55vw 38vh at 82% -8%, rgba(34, 197, 94, 0.05), transparent 60%),
-    radial-gradient(48vw 34vh at 10% 2%, rgba(255, 193, 69, 0.04), transparent 62%),
+    radial-gradient(55vw 38vh at 82% -8%, rgba(0, 255, 102, 0.05), transparent 60%),
+    radial-gradient(48vw 34vh at 10% 2%, rgba(255, 149, 0, 0.04), transparent 62%),
     var(--color-paper);
   background-attachment: fixed;
 }
@@ -387,11 +387,11 @@ body {
   0%,
   100% {
     transform: scale(1);
-    filter: drop-shadow(0 0 0 rgba(255, 193, 69, 0));
+    filter: drop-shadow(0 0 0 rgba(255, 149, 0, 0));
   }
   50% {
     transform: scale(1.12);
-    filter: drop-shadow(0 0 6px rgba(255, 193, 69, 0.75));
+    filter: drop-shadow(0 0 6px rgba(255, 149, 0, 0.75));
   }
 }
 
