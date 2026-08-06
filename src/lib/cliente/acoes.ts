@@ -25,6 +25,7 @@ import {
   recadoSchema,
   removerOfertaSchema,
   removerTemplateSchema,
+  salvarExerciciosSchema,
   solicitarVinculoSchema,
   templateNutricaoSchema,
   templateTreinoSchema,
@@ -370,6 +371,49 @@ export async function atualizarTreino(input: unknown): Promise<ResultadoAcao> {
 
   revalidatePath(`/pro/clientes/${cliente.id}`);
   revalidatePath("/pro");
+  return { sucesso: true };
+}
+
+/**
+ * Define a lista de exercícios do treino ativo do cliente (o lado "personal
+ * prescreve" do treino estruturado). Substitui a lista inteira — exercício
+ * prescrito é config, não registro de negócio, então DELETE aqui é de verdade.
+ * Exige um treino ativo primeiro (o cabeçalho vem de atualizarTreino).
+ */
+export async function salvarExerciciosDoTreino(input: unknown): Promise<ResultadoAcao> {
+  const parsed = salvarExerciciosSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+
+  const profissional = await exigirCapacidade(Capacidade.TREINO);
+  const cliente = await exigirVinculo(parsed.data.clienteId, profissional.id, TipoVinculo.TREINO);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+
+  const treino = await prismaNutri.treinoPrescrito.findFirst({
+    where: { clienteId: cliente.id, ativo: true },
+    orderBy: { criadoEm: "desc" },
+  });
+  if (!treino) return { sucesso: false, erro: "prescreva um treino antes de detalhar os exercícios" };
+
+  await prismaNutri.$transaction([
+    prismaNutri.exercicioPrescrito.deleteMany({ where: { treinoId: treino.id } }),
+    ...parsed.data.exercicios.map((e, i) =>
+      prismaNutri.exercicioPrescrito.create({
+        data: {
+          treinoId: treino.id,
+          nome: e.nome,
+          ordem: i,
+          seriesAlvo: e.seriesAlvo,
+          repsAlvo: e.repsAlvo,
+          cargaAlvoKg: e.cargaAlvoKg,
+          descansoSeg: e.descansoSeg,
+        },
+      }),
+    ),
+  ]);
+
+  revalidatePath(`/pro/clientes/${cliente.id}`);
   return { sucesso: true };
 }
 

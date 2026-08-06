@@ -6,6 +6,7 @@ import { buscarComparacaoSemanas, buscarFichaDoCliente } from "@/lib/profissiona
 import { formatarPace } from "@/lib/cliente/corrida";
 import { EditorCliente } from "@/components/cliente/EditorCliente";
 import { ComparativoSemanas } from "@/components/profissional/ComparativoSemanas";
+import { EditorExercicios } from "@/components/profissional/EditorExercicios";
 import { NoSheipeLogo } from "@/components/nutri/NoSheipeLogo";
 
 const FORMATADOR_DATA = new Intl.DateTimeFormat("pt-BR", {
@@ -132,6 +133,10 @@ export default async function FichaCliente({ params }: { params: { id: string } 
           templatesTreino={ficha.templatesTreino}
         />
       </div>
+
+      {ficha.acompanhaTreino && ficha.treino && (
+        <EditorExercicios clienteId={cliente.id} exerciciosIniciais={ficha.treino.exercicios} />
+      )}
     </main>
   );
 }

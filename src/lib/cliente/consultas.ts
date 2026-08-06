@@ -12,6 +12,7 @@ import { calcularHidratacao, type Hidratacao } from "@/lib/cliente/hidratacao";
 import { calcularOfensiva, type Ofensiva } from "@/lib/cliente/ofensiva";
 import { calcularRecordes, paceSegundosPorKm, type Recordes } from "@/lib/cliente/corrida";
 import { ordenarRanking, type EntradaRanking } from "@/lib/cliente/ranking";
+import { recordesPorExercicio, type RecordeExercicio } from "@/lib/cliente/forca";
 
 export async function buscarClientePorToken(token: string) {
   const cliente = await prismaNutri.cliente.findUnique({ where: { tokenAcesso: token } });
@@ -389,33 +390,76 @@ const FORMATADOR_DIA = new Intl.DateTimeFormat("pt-BR", {
   month: "2-digit",
 });
 
+export interface ExercicioPrescritoDado {
+  id: string;
+  nome: string;
+  ordem: number;
+  seriesAlvo: number;
+  repsAlvo: string;
+  cargaAlvoKg: number | null;
+  descansoSeg: number | null;
+}
+
 export interface TreinoDoClienteDados {
-  treino: { nome: string; descricao: string; diasPorSemana: number } | null;
+  treino: {
+    id: string;
+    nome: string;
+    descricao: string;
+    diasPorSemana: number;
+    exercicios: ExercicioPrescritoDado[];
+  } | null;
   aderenciaSemana: AderenciaTreino | null;
   sessoes: { id: string; entradaBruta: string; dia: string; horario: string }[];
+  /** Recordes de carga por exercício, das séries que o cliente já registrou. */
+  recordes: RecordeExercicio[];
 }
 
 /**
- * Tudo que a aba Treino precisa: o treino prescrito ativo, a aderência da
- * semana (mesmo cálculo do anel da home) e as últimas sessões registradas —
- * histórico mais fundo que o "hoje" do painel.
+ * Tudo que a aba Treino precisa: o treino prescrito ativo com seus exercícios,
+ * a aderência da semana (mesmo cálculo do anel da home), as últimas sessões e
+ * os recordes de carga por exercício (do treino estruturado).
  */
 export async function buscarTreinoDoCliente(clienteId: string, dias = 14): Promise<TreinoDoClienteDados> {
   const { inicio: inicioSemana, fim: fimSemana } = limitesDaSemanaEmSaoPaulo();
   const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
 
-  const [treino, sessoesSemana, sessoes] = await Promise.all([
-    prismaNutri.treinoPrescrito.findFirst({ where: { clienteId, ativo: true }, orderBy: { criadoEm: "desc" } }),
+  const [treino, sessoesSemana, sessoes, series] = await Promise.all([
+    prismaNutri.treinoPrescrito.findFirst({
+      where: { clienteId, ativo: true },
+      orderBy: { criadoEm: "desc" },
+      include: { exercicios: { orderBy: { ordem: "asc" } } },
+    }),
     prismaNutri.sessaoTreino.findMany({ where: { clienteId, realizadoEm: { gte: inicioSemana, lt: fimSemana } } }),
     prismaNutri.sessaoTreino.findMany({
       where: { clienteId, realizadoEm: { gte: desde } },
       orderBy: { realizadoEm: "desc" },
       take: 30,
     }),
+    // Séries de sessões não removidas — base dos recordes de carga.
+    prismaNutri.serieRegistrada.findMany({
+      where: { sessao: { clienteId, removidoEm: null } },
+      select: { exercicio: true, cargaKg: true, reps: true },
+    }),
   ]);
 
   return {
-    treino: treino ? { nome: treino.nome, descricao: treino.descricao, diasPorSemana: treino.diasPorSemana } : null,
+    treino: treino
+      ? {
+          id: treino.id,
+          nome: treino.nome,
+          descricao: treino.descricao,
+          diasPorSemana: treino.diasPorSemana,
+          exercicios: treino.exercicios.map((e) => ({
+            id: e.id,
+            nome: e.nome,
+            ordem: e.ordem,
+            seriesAlvo: e.seriesAlvo,
+            repsAlvo: e.repsAlvo,
+            cargaAlvoKg: e.cargaAlvoKg,
+            descansoSeg: e.descansoSeg,
+          })),
+        }
+      : null,
     aderenciaSemana: treino ? calcularAderenciaTreino(sessoesSemana, treino.diasPorSemana) : null,
     sessoes: sessoes.map((s) => ({
       id: s.id,
@@ -423,6 +467,7 @@ export async function buscarTreinoDoCliente(clienteId: string, dias = 14): Promi
       dia: FORMATADOR_DIA.format(s.realizadoEm),
       horario: FORMATADOR_HORA.format(s.realizadoEm),
     })),
+    recordes: recordesPorExercicio(series),
   };
 }
 

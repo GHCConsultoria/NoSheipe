@@ -18,6 +18,7 @@ import {
   registrarCorridaSchema,
   registrarPesoSchema,
   registrarSchema,
+  registrarTreinoEstruturadoSchema,
   removerFavoritoSchema,
   removerInscricaoPushSchema,
   removerRegistroSchema,
@@ -330,6 +331,54 @@ export async function registrarTreino(input: unknown): Promise<ResultadoAcaoPubl
   } catch (erro) {
     // Corrida entre dois envios com o mesmo clientLogId (duplo clique):
     // a unique constraint pegou, então já está salvo.
+    const jaSalvo = await prismaNutri.sessaoTreino.findUnique({
+      where: { clienteRegistroId: parsed.data.clientLogId },
+    });
+    if (jaSalvo) return { sucesso: true };
+    throw erro;
+  }
+
+  revalidatePath(`/p/${parsed.data.token}`);
+  return { sucesso: true };
+}
+
+/**
+ * Treino estruturado: uma sessão com várias séries (exercício + carga + reps).
+ * Convive com o check-in de texto — as duas geram uma SessaoTreino, então a
+ * aderência da semana e a ofensiva contam igual. Só séries com carga ou reps
+ * preenchidos viram linha. Idempotente por clientLogId.
+ */
+export async function registrarTreinoEstruturado(input: unknown): Promise<ResultadoAcaoPublica> {
+  const parsed = registrarTreinoEstruturadoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { sucesso: false, erro: parsed.error.issues[0]?.message ?? "payload inválido" };
+  }
+
+  const cliente = await clientePeloToken(parsed.data.token);
+  if (!cliente) return { sucesso: false, erro: "cliente não encontrado" };
+  if (!cliente.consentimentoEm) return { sucesso: false, erro: "consentimento obrigatório antes de registrar" };
+
+  const existente = await prismaNutri.sessaoTreino.findUnique({
+    where: { clienteRegistroId: parsed.data.clientLogId },
+  });
+  if (existente) return { sucesso: true };
+
+  const series = parsed.data.series.filter((s) => (s.cargaKg ?? 0) > 0 || (s.reps ?? 0) > 0);
+  if (series.length === 0) return { sucesso: false, erro: "preencha carga ou reps de ao menos uma série" };
+
+  try {
+    await prismaNutri.sessaoTreino.create({
+      data: {
+        clienteId: cliente.id,
+        clienteRegistroId: parsed.data.clientLogId,
+        origem: "TEXTO",
+        entradaBruta: parsed.data.nomeTreino,
+        series: {
+          create: series.map((s, i) => ({ exercicio: s.exercicio, ordem: i, cargaKg: s.cargaKg, reps: s.reps })),
+        },
+      },
+    });
+  } catch (erro) {
     const jaSalvo = await prismaNutri.sessaoTreino.findUnique({
       where: { clienteRegistroId: parsed.data.clientLogId },
     });

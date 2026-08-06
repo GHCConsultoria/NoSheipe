@@ -18,6 +18,7 @@ import {
   paceSegundosPorKm,
 } from "@/lib/cliente/corrida";
 import type { CorridasDados, RankingRBP, TreinoDoClienteDados } from "@/lib/cliente/consultas";
+import { BlocoTreinoEstruturado, RecordesDeCarga } from "@/components/cliente/TreinoEstruturado";
 
 /**
  * Aba Treino do cliente: o treino prescrito ativo, a aderência da semana e o
@@ -31,6 +32,7 @@ export function TreinoDoCliente({
   sessoes,
   corridas,
   ranking,
+  recordes,
 }: TreinoDoClienteDados & { token: string; corridas: CorridasDados; ranking: RankingRBP }) {
   const router = useRouter();
   const [texto, setTexto] = useState("");
@@ -78,6 +80,12 @@ export function TreinoDoCliente({
       ) : (
         <p className="mt-6 text-sm text-attention">Seu personal ainda não prescreveu um treino.</p>
       )}
+
+      {treino && treino.exercicios.length > 0 && (
+        <BlocoTreinoEstruturado token={token} treino={{ nome: treino.nome, exercicios: treino.exercicios }} recordes={recordes} />
+      )}
+
+      <RecordesDeCarga recordes={recordes} />
 
       <BlocoCorrida token={token} corridas={corridas} />
 
