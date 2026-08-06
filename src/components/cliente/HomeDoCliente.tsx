@@ -108,13 +108,33 @@ export function HomeDoCliente({
   const primeiroNome = nome.trim().split(/\s+/)[0];
   const semanasSeguidas = Math.floor(ofensiva.dias / 7);
 
+  const agora = new Date();
+  const dataHoje = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+  }).format(agora);
+  const horaSP = Number(
+    new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(agora),
+  );
+  const saudacao = horaSP < 12 ? "Bom dia" : horaSP < 18 ? "Boa tarde" : "Boa noite";
+
   return (
     <main className="mx-auto max-w-md px-6 pb-10 pt-6">
-      <div className="flex items-baseline justify-between gap-3">
-        <h1 className="font-display text-2xl">Olá, {primeiroNome}!</h1>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[0.62rem] font-medium uppercase tracking-[0.24em] text-ink-faint first-letter:uppercase">
+            {dataHoje}
+          </p>
+          <h1 className="mt-1.5 font-display text-3xl font-bold leading-[1.06] tracking-tight">
+            {saudacao},<br />
+            <span className="text-ink-soft">{primeiroNome}.</span>
+          </h1>
+        </div>
         {semanasSeguidas >= 1 && (
-          <span className="shrink-0 rounded-full bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-400">
-            🔥 {semanasSeguidas} {semanasSeguidas === 1 ? "semana azul" : "semanas azuis"}
+          <span className="mt-1 shrink-0 rounded-full border border-treino/40 bg-treino/10 px-2.5 py-1 text-xs font-medium text-treino">
+            🔥 {semanasSeguidas} {semanasSeguidas === 1 ? "semana" : "semanas"}
           </span>
         )}
       </div>
