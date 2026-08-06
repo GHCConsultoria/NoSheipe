@@ -55,23 +55,19 @@ function Anel({ raio, pct, cor, atraso }: { raio: number; pct: number; cor: stri
 }
 
 /**
- * O progresso do dia como o diagrama pediu: treino (verde) por fora, dieta
- * (gold) no meio e a ÁGUA no centro — agora uma bolha de vidro que enche de
- * verdade e cuja superfície BALANÇA quando o aparelho se mexe.
+ * O progresso do dia: treino (verde) por fora, dieta (gold) no meio e a ÁGUA
+ * no centro — um disco que enche de verdade, com a crista da onda deslizando.
+ * O número grande é a composição do dia.
  *
- * O nível é uma translateY do grupo cheio (com transição, pra subir visível
- * ao registrar um copo). Por cima disso, um giro contido pela mão do usuário:
- * o `deviceorientation` (giroscópio) inclina a superfície pro lado contrário
- * ao do aparelho — como um líquido de verdade — com uma mola (lerp) que dá o
- * balanço. Sem sensor, sem permissão ou com "reduzir movimento", fica só a
- * ondinha parada; nada quebra.
+ * Além do nível (translateY com transição, que sobe ao registrar um copo), a
+ * superfície BALANÇA com o movimento do aparelho: o deviceorientation
+ * (giroscópio) inclina o líquido pro lado contrário ao do giro, como um
+ * líquido de verdade, com uma mola (lerp). Sem sensor, sem permissão ou com
+ * "reduzir movimento", fica só a ondinha parada — nada quebra.
  */
 export function AnelDoDia({ treino, dieta, total }: Props) {
   const numero = useContagem(total);
-  const idBase = useId().replace(/:/g, "");
-  const clip = `clip-${idBase}`;
-  const gloss = `gloss-${idBase}`;
-  const depth = `depth-${idBase}`;
+  const clip = useId().replace(/:/g, "");
 
   const tiltRef = useRef<SVGGElement | null>(null);
 
@@ -147,17 +143,6 @@ export function AnelDoDia({ treino, dieta, total }: Props) {
             <clipPath id={clip}>
               <circle cx={CENTRO} cy={CENTRO} r={RAIO_AGUA} />
             </clipPath>
-            {/* Brilho de vidro: reflexo forte no alto-esquerda esmaecendo. */}
-            <radialGradient id={gloss} cx="34%" cy="26%" r="78%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
-              <stop offset="34%" stopColor="#ffffff" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </radialGradient>
-            {/* Profundidade do líquido: mais claro na crista, fundo mais denso. */}
-            <linearGradient id={depth} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-agua)" stopOpacity="0.7" />
-              <stop offset="100%" stopColor="var(--color-agua)" stopOpacity="1" />
-            </linearGradient>
           </defs>
 
           <g transform={`rotate(-90 ${CENTRO} ${CENTRO})`}>
@@ -165,8 +150,8 @@ export function AnelDoDia({ treino, dieta, total }: Props) {
             {dieta !== null && <Anel raio={RAIO_DIETA} pct={dieta} cor="var(--color-dieta)" atraso={120} />}
           </g>
 
-          {/* Poço da bolha (fundo escuro) e o líquido recortado no disco. */}
-          <circle cx={CENTRO} cy={CENTRO} r={RAIO_AGUA} fill="#06131a" />
+          {/* Poço da água (fundo) e o líquido recortado no disco. */}
+          <circle cx={CENTRO} cy={CENTRO} r={RAIO_AGUA} fill="var(--color-rule)" opacity={0.35} />
           <g clipPath={`url(#${clip})`}>
             {/* Grupo do TILT (giro pela mão) girando em torno do centro do disco. */}
             <g ref={tiltRef}>
@@ -177,35 +162,21 @@ export function AnelDoDia({ treino, dieta, total }: Props) {
                 }}
               >
                 {/* Corpo do líquido, do topo do disco bem pra baixo. */}
-                <rect x={CENTRO - 70} y={topoAgua + 6} width={140} height={alturaAgua + 70} fill={`url(#${depth})`} />
+                <rect x={CENTRO - 70} y={topoAgua + 6} width={140} height={alturaAgua + 70} fill="var(--color-agua)" opacity={0.9} />
                 {/* Crista: uma onda larga que desliza de lado (loop de 40px). */}
                 <path
                   className="onda-agua"
-                  fill={`url(#${depth})`}
+                  fill="var(--color-agua)"
                   d={`M${CENTRO - 110},${topoAgua + 6} q10,-6 20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 V${topoAgua + alturaAgua + 70} H${CENTRO - 110} Z`}
-                />
-                {/* Reflexo fino na linha da água. */}
-                <path
-                  className="onda-agua"
-                  fill="none"
-                  stroke="#e0fbff"
-                  strokeWidth={1.5}
-                  strokeOpacity={0.5}
-                  d={`M${CENTRO - 110},${topoAgua + 6} q10,-6 20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0 t20,0`}
                 />
               </g>
             </g>
           </g>
-
-          {/* Vidro por cima: sheen radial + realce especular + aro. */}
-          <circle cx={CENTRO} cy={CENTRO} r={RAIO_AGUA} fill={`url(#${gloss})`} />
-          <ellipse cx={CENTRO - 15} cy={CENTRO - 24} rx={16} ry={9} fill="#ffffff" opacity={0.35} transform={`rotate(-28 ${CENTRO - 15} ${CENTRO - 24})`} />
-          <circle cx={CENTRO} cy={CENTRO} r={RAIO_AGUA} fill="none" stroke="#bff0fa" strokeWidth={1.5} strokeOpacity={0.55} />
-          <circle cx={CENTRO} cy={CENTRO} r={RAIO_AGUA - 1} fill="none" stroke="#000" strokeWidth={2} strokeOpacity={0.25} />
+          <circle cx={CENTRO} cy={CENTRO} r={RAIO_AGUA} fill="none" stroke="var(--color-agua)" strokeWidth={2} opacity={0.5} />
         </svg>
 
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-display text-4xl leading-none tabular-nums text-ink drop-shadow-[0_1px_6px_rgba(0,0,0,0.7)]">
+          <span className="font-display text-4xl leading-none tabular-nums text-ink">
             {numero}
             <span className="text-xl">%</span>
           </span>
